@@ -25,6 +25,7 @@ class fifo_env extends uvm_env;
     agent.ap.connect(scoreboard.imp);
     agent.ap.connect(coverage.analysis_export);
     agent.monitor.rst_ap.connect(scoreboard.rst_imp);
+    agent.monitor.rst_ap.connect(coverage.rst_imp);
   endfunction
 
 endclass

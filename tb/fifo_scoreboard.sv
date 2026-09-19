@@ -86,8 +86,6 @@ class fifo_scoreboard extends uvm_scoreboard;
     super.report_phase(phase);
     status = (mismatches == 0) ? "PASS" : "FAIL";
     `uvm_info(get_type_name(), $sformatf("\n===== FIFO Scoreboard Summary =====\n  Status            : %s\n  Writes            : %0d\n  Reads             : %0d\n  Overflow attempts : %0d\n  Underflow attempts: %0d\n  Mismatches        : %0d\n===================================", status, writes, reads, overflow_attempts, underflow_attempts, mismatches), UVM_LOW)
-    if (mismatches != 0)
-      `uvm_error(get_type_name(), $sformatf("Scoreboard FAILED with %0d mismatches", mismatches))
   endfunction
 
 endclass

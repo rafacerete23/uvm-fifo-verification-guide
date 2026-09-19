@@ -191,4 +191,39 @@ class fifo_random_test extends fifo_base_test;
 
 endclass
 
+// Reset aplicado dos veces en medio de trafico aleatorio: el modelo del
+// scoreboard y la ocupacion de cobertura deben vaciarse con la FIFO.
+class fifo_reset_mid_traffic_test extends fifo_base_test;
+  `uvm_component_utils(fifo_reset_mid_traffic_test)
+
+  function new(string name = "fifo_reset_mid_traffic_test", uvm_component parent = null);
+    super.new(name, parent);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    fifo_rand_seq seq;
+
+    phase.raise_objection(this);
+
+    seq = fifo_rand_seq::type_id::create("seq");
+    seq.n = 800;
+    seq.wr_weight = 60;
+    seq.rd_weight = 30;
+
+    fork
+      seq.start(env.agent.sequencer);
+      begin
+        wait_clocks(60);   // deja que la FIFO se llene
+        vif.apply_reset(3);
+        wait_clocks(240);
+        vif.apply_reset(3);
+      end
+    join
+
+    wait_clocks(5);
+    phase.drop_objection(this);
+  endtask
+
+endclass
+
 `endif

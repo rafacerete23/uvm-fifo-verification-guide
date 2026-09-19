@@ -8,6 +8,7 @@ class fifo_coverage extends uvm_subscriber #(fifo_item);
   fifo_item tr;
 
   int unsigned occupancy;
+  uvm_analysis_imp_rst #(bit, fifo_coverage) rst_imp;
 
   covergroup fifo_cg;
     option.per_instance = 1;
@@ -48,6 +49,12 @@ class fifo_coverage extends uvm_subscriber #(fifo_item);
     super.new(name, parent);
     occupancy = 0;
     fifo_cg = new();
+    rst_imp = new("rst_imp", this);
+  endfunction
+
+  // El reset vacia la FIFO: reinicia el modelo de ocupacion
+  function void write_rst(bit rst);
+    if (rst) occupancy = 0;
   endfunction
 
   function void write(fifo_item t);

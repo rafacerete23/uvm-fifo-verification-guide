@@ -111,7 +111,19 @@ Abre **`docs/index.html`** directamente en tu navegador. Incluye:
 
 ---
 
+## Curso: de electricidad básica a nivel profesional
+
+`docs/curso.html` es un curso interactivo en 8 niveles (el último es preparación de entrevistas) (electricidad → lógica → secuencial → FIFO → UVM → cobertura y aserciones → prácticas de empresa) con calculadoras, un simulador de la FIFO (modelo del RTL, scoreboard y forma de onda), quizzes y un diagrama UVM clicable. Ábrelo directamente en el navegador.
+
 ## Registro de cambios
+
+### 2026-09-19 — Curso 0→experto y scripts robustos
+
+- Nuevo `docs/curso.html` (8 niveles + entrevistas, simulador interactivo, quizzes, móvil).
+- `docs/curso.html`: capa móvil (menú lateral tipo drawer, sin desborde horizontal a 375 px, controles táctiles de 44 px) y nuevo Nivel 7 de entrevista con flashcards filtrables, simulacro con temporizador, checklist de corner cases FIFO y ejercicios de pizarra; respuestas revisadas por verificación cruzada.
+- `sim/run_selfcheck.sh`, `sim/run_questa.sh` ahora devuelven código de salida distinto de 0 si falla la verificación; `run_questa.sh` acepta semilla.
+- Nuevo `sim/run_regression.sh` (autoverificable + tests UVM × semillas).
+- Nuevo `tb/fifo_sva.sv` (aserciones + cover, conectado con `bind`), test `fifo_reset_mid_traffic_test`; el driver descarta items durante reset; la cobertura reinicia la ocupación con el reset; el scoreboard ya no duplica el error en `report_phase`.
 
 - **2026-09-19** — Clase 1 (reset asíncrono y su verificación) con laboratorio interactivo; ejercicios 4–6; Fase 9 en `tb/selfcheck_tb.sv` (reset a mitad de ciclo desde FIFO llena, pulso de reset entre flancos, escrituras durante el reset): PASS sobre 15,354 ciclos. El testbench UVM sigue sin ejecutarse en ningún simulador (los fragmentos de aserción del ejercicio 6 tampoco se ejecutaron).
 - **2026-09-19** — Versión inicial.

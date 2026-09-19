@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>De la electricidad al verificador profesional: FIFO síncrono</title>
+<style>
+:root{
+  --bg:#050a14;
+  --panel:rgba(255,255,255,.045);
+  --panel2:rgba(255,255,255,.08);
+  --border:rgba(255,255,255,.14);
+  --text:#e6f1ff;
+  --muted:#9fb2cc;
+  --cyan:#22d3ee;
+  --magenta:#e879f9;
+  --lime:#a3e635;
+  --amber:#fbbf24;
+  --red:#fb7185;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --radius:1rem;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:2rem}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.6;
+  background-image:radial-gradient(circle at 15% 15%,rgba(34,211,238,.08),transparent 30%),radial-gradient(circle at 85% 85%,rgba(232,121,249,.08),transparent 30%);
+}
+a{color:var(--cyan)}
+.skip-link{position:absolute;left:-999px;top:0;background:var(--cyan);color:#000;padding:.5rem 1rem;z-index:99}
+.skip-link:focus{left:0}
+.progress{position:fixed;top:0;left:0;height:4px;width:100%;background:transparent;z-index:100}
+#progressBar{height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--magenta),var(--lime));box-shadow:0 0 18px var(--cyan)}
+.layout{display:grid;grid-template-columns:270px minmax(0,1fr)}
+.sidebar{
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+  padding:1.5rem 1rem 2rem;
+  background:rgba(4,8,18,.85);
+  backdrop-filter:blur(12px);
+  border-right:1px solid var(--border);
+  z-index:50;
+}
+.brand{font-weight:900;font-size:1.25rem;letter-spacing:.5px;margin-bottom:1rem;color:var(--text)}
+.brand span{color:var(--cyan);text-shadow:0 0 14px var(--cyan)}
+.nav-link{
+  display:flex;align-items:center;gap:.6rem;
+  padding:.5rem .6rem;margin:.2rem 0;border-radius:.6rem;
+  color:var(--muted);text-decoration:none;border:1px solid transparent;
+  transition:.2s;
+}
+.nav-link:hover{background:var(--panel2);color:var(--text)}
+.nav-link.active{background:rgba(34,211,238,.12);color:var(--cyan);border-color:rgba(34,211,238,.5);box-shadow:0 0 12px rgba(34,211,238,.2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.nav-link.active .dot{background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+main{max-width:1050px;margin:0 auto;padding:2rem 1.5rem 6rem}
+.hero{text-align:center;padding:2.5rem 1rem 2rem;margin-bottom:1rem}
+.hero h1{font-size:clamp(1.8rem,5vw,3rem);margin:.2rem 0;background:linear-gradient(90deg,var(--cyan),var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:var(--muted);max-width:700px;margin:1rem auto}
+.hero a{display:inline-block;margin:.5rem;padding:.5rem 1rem;border:1px solid var(--border);border-radius:2rem;text-decoration:none;background:var(--panel2)}
+.level{margin-bottom:4rem}
+.level-header{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin:0 0 1.2rem}
+.level-header h2{font-size:clamp(1.3rem,3vw,2rem);margin:.5rem 0}
+.badge{font-size:.75rem;font-weight:800;letter-spacing:1px;padding:.25rem .7rem;border-radius:2rem;text-transform:uppercase}
+.basico{background:rgba(34,211,238,.15);color:var(--cyan);border:1px solid rgba(34,211,238,.5)}
+.intermedio{background:rgba(251,191,36,.15);color:var(--amber);border:1px solid rgba(251,191,36,.5)}
+.avanzado{background:rgba(232,121,249,.15);color:var(--magenta);border:1px solid rgba(232,121,249,.5)}
+.experto{background:rgba(163,230,53,.15);color:var(--lime);border:1px solid rgba(163,230,53,.5)}
+.card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:1.4rem;
+  margin:1rem 0;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);
+  backdrop-filter:blur(8px);
+}
+.card h3{margin-top:0;color:var(--cyan)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}
+.btn{
+  background:var(--panel2);color:var(--text);border:1px solid var(--border);
+  padding:.55rem 1rem;border-radius:.7rem;cursor:pointer;font-weight:600;
+  transition:.2s;margin:.2rem;font-family:inherit;font-size:inherit;
+}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(34,211,238,.25);border-color:var(--cyan)}
+.btn:focus-visible{outline:2px solid var(--magenta);outline-offset:2px}
+.btn.primary{background:linear-gradient(135deg,rgba(34,211,238,.25),rgba(232,121,249,.25));border-color:rgba(34,211,238,.6)}
+.btn.reset{color:var(--red);border-color:rgba(251,113,133,.5)}
+.btn.correct{background:rgba(163,230,53,.2);border-color:var(--lime);color:var(--lime)}
+.btn.incorrect{background:rgba(251,113,133,.2);border-color:var(--red);color:var(--red)}
+input[type=range]{width:100%;accent-color:var(--cyan)}
+input[type=number],select{background:#0b1322;color:var(--text);border:1px solid var(--border);border-radius:.6rem;padding:.45rem}
+code{font-family:var(--mono);background:rgba(255,255,255,.08);padding:.1rem .3rem;border-radius:.3rem}
+pre{
+  background:#0a0f1c;border:1px solid var(--border);border-radius:var(--radius);padding:1rem;
+  overflow-x:auto;font-size:.85rem;line-height:1.5;color:#dbeafe;font-family:var(--mono);
+  box-shadow:inset 0 0 30px rgba(0,0,0,.7);
+}
+pre code{background:none;padding:0}
+.tok-c{color:#64748b;font-style:italic}
+.tok-s{color:#fbbf24}
+.tok-k{color:#22d3ee;font-weight:700}
+.tok-n{color:#a3e635}
+.sim-layout{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.memory{display:flex;flex-wrap:wrap;gap:.4rem}
+.slot{
+  width:58px;height:52px;border-radius:.6rem;border:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:var(--mono);background:#0b1322;transition:.2s;
+}
+.slot.wr{border-color:var(--cyan);box-shadow:0 0 14px rgba(34,211,238,.6)}
+.slot.rd{border-color:var(--magenta);box-shadow:0 0 14px rgba(232,121,249,.6)}
+.slot .idx{opacity:.6;font-size:.7rem}
+.slot .val{font-weight:700}
+.flag{font-family:var(--mono);padding:.4rem .8rem;border-radius:.6rem;background:var(--panel2);border:1px solid transparent}
+.flag.on{background:rgba(251,191,36,.2);border-color:var(--amber);color:var(--amber)}
+.occbar{height:12px;background:#0b1322;border:1px solid var(--border);border-radius:1rem;overflow:hidden;flex:1}
+#occBarFill{height:100%;width:0;background:linear-gradient(90deg,var(--lime),var(--cyan),var(--magenta));transition:width .2s}
+.log{max-height:110px;overflow-y:auto;font-size:.78rem;font-family:var(--mono);background:#0a0f1c;border:1px solid var(--border);border-radius:.6rem;padding:.5rem;margin:.5rem 0}
+.wave-row{display:flex;align-items:center;gap:.4rem;margin:.2rem 0;font-family:var(--mono);font-size:.72rem}
+.wave-label{width:70px;flex:none;color:var(--muted)}
+.wave-cells{display:flex;gap:1px;flex:1}
+.wcell{flex:1;height:18px;border-radius:2px;background:#0b1322;text-align:center;line-height:18px;color:#000;font-size:.65rem;font-weight:700}
+.wcell.high{background:var(--lime)}
+.wcell.mid{background:var(--cyan)}
+.wcell.full{background:var(--amber)}
+.svg-node{stroke:var(--cyan);fill:rgba(34,211,238,.05);cursor:pointer;transition:.2s}
+.svg-node:hover{fill:rgba(34,211,238,.2)}
+.quiz{background:rgba(255,255,255,.03);border:1px dashed var(--border);border-radius:var(--radius);padding:1rem;margin:1.5rem 0}
+.q{margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.feedback{font-weight:700;margin-top:.3rem}
+.truth-grid{display:grid;grid-template-columns:repeat(4,auto);gap:.5rem;align-items:center;justify-content:start}
+.gate-btn.active{background:rgba(34,211,238,.25);border-color:var(--cyan);color:var(--cyan)}
+.bin{display:inline-block;padding:.2rem .6rem;border:1px solid var(--border);border-radius:2rem;margin:.1rem;font-size:.8rem;color:var(--muted)}
+.bin.filled{background:rgba(163,230,53,.15);color:var(--lime);border-color:var(--lime)}
+.electron-flow{display:flex;gap:2rem;align-items:center;height:30px;overflow:hidden;position:relative;border-top:2px solid var(--border);border-bottom:2px solid var(--border)}
+.electron{width:10px;height:10px;border-radius:50%;background:var(--cyan);box-shadow:0 0 14px var(--cyan);animation:flow 3s linear infinite;flex:none}
+@keyframes flow{from{transform:translateX(-60px)}to{transform:translateX(120vw)}}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  .electron{animation:none;box-shadow:none}
+}
+@media (max-width:760px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{position:relative;height:auto;max-height:45vh;border-right:0;border-bottom:1px solid var(--border)}
+  .sim-layout{grid-template-columns:1fr}
+  main{padding:1.2rem 1rem 4rem}
+}
+</style>
+<style id="iv-interview-css">
+.iv-steps{padding-left:1.3rem;margin:.6rem 0}
+.iv-steps li{margin:.35rem 0;overflow-wrap:anywhere}
+.iv-filters{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:1rem}
+.iv-chips{display:flex;flex-wrap:wrap;gap:.45rem}
+.iv-chip,.btn{font-size:inherit}
+.iv-chip{
+  min-height:44px;padding:.5rem .8rem;border-radius:2rem;border:1px solid var(--border);
+  background:var(--panel2);color:var(--text);cursor:pointer;touch-action:manipulation;font-weight:600;
+}
+.iv-chip:focus-visible,.btn:focus-visible{outline:2px solid var(--magenta);outline-offset:2px}
+.iv-chip.active{background:rgba(34,211,238,.15);border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 12px rgba(34,211,238,.25)}
+.iv-level-box{display:flex;align-items:center;gap:.4rem}
+.iv-level-box label{color:var(--muted);font-size:.9rem}
+.iv-level-box select,.iv-filters input[type=search]{
+  min-height:44px;font-size:16px;background:#0b1322;color:var(--text);border:1px solid var(--border);
+  border-radius:.6rem;padding:.45rem .6rem;max-width:100%;
+}
+.iv-filters input[type=search]{flex:1;min-width:180px}
+.iv-progress{display:flex;align-items:center;gap:.6rem;margin:.6rem 0 1rem}
+.iv-progress-track{flex:1;height:12px;background:#0b1322;border:1px solid var(--border);border-radius:1rem;overflow:hidden}
+.iv-progress-fill{height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--magenta),var(--lime));transition:width .2s}
+.iv-list{display:flex;flex-direction:column;gap:1rem}
+.iv-flash{
+  background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--radius);
+  padding:1rem;min-width:0;
+}
+.iv-flash-head{display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;margin-bottom:.4rem}
+.iv-cat{font-size:.75rem;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--magenta);border:1px solid rgba(232,121,249,.5);border-radius:2rem;padding:.1rem .6rem}
+.iv-lvl{color:var(--muted);font-size:.8rem;font-weight:700}
+.iv-q{margin:.4rem 0 .6rem;font-weight:600}
+.iv-answer{background:#0a0f1c;border:1px dashed var(--border);border-radius:.6rem;padding:.7rem .8rem;margin:.5rem 0}
+.iv-a{color:var(--text)}
+.iv-a p{margin:.5rem 0}
+.iv-pre{background:#090d17;border:1px solid var(--border);border-radius:.5rem;padding:.7rem;overflow-x:auto;-webkit-overflow-scrolling:touch;font-size:.8rem;line-height:1.45;color:#dbeafe;font-family:var(--mono)}
+.iv-pre code{background:none;padding:0;white-space:pre;overflow-wrap:normal}
+.iv-trap{margin:.4rem 0 0;font-size:.9rem;color:var(--amber)}
+.iv-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem}
+.iv-actions .btn{min-height:44px}
+.iv-actions .btn.correct{background:rgba(163,230,53,.2);border-color:var(--lime);color:var(--lime)}
+.iv-actions .btn.incorrect{background:rgba(251,113,133,.2);border-color:var(--red);color:var(--red)}
+.iv-sim-start{padding:.5rem 0}
+.iv-sim-q{font-weight:700;font-size:1.05rem;margin:.6rem 0}
+.iv-timer{font-family:var(--mono);font-size:1.2rem;color:var(--cyan);margin-bottom:.4rem}
+.iv-sim-answer{margin-top:.8rem}
+.iv-sim-answer .iv-a{margin-bottom:.4rem}
+.iv-sim-answer .iv-trap{margin-top:.4rem}
+.iv-checklist{list-style:none;padding:0;margin:.6rem 0}
+.iv-check-item{margin:.45rem 0}
+.iv-check-label{display:flex;gap:.6rem;align-items:flex-start;cursor:pointer;padding:.35rem .3rem;border-radius:.5rem;transition:.15s}
+.iv-check-label:hover{background:var(--panel2)}
+.iv-checkbox{width:20px;height:20px;flex:none;accent-color:var(--cyan);margin-top:.15rem}
+.iv-src a{color:var(--cyan);text-decoration:none}
+.iv-src a:hover{text-decoration:underline}
+@media (max-width:899px){
+  .iv-filters,.iv-actions{flex-direction:column;align-items:stretch}
+  .iv-filters input[type=search]{min-width:0;width:100%}
+  .iv-flash{padding:.9rem}
+  .iv-pre{max-width:100%;overflow-x:auto;box-shadow:none}
+  .iv-actions .btn{width:100%}
+  .iv-chip{min-height:44px}
+}
+@media (hover:none){
+  .iv-chip:hover,.iv-check-label:hover{background:none}
+}
+</style>
+<style id="mobile-layer">
+/* ===== Capa móvil (drawer, toques, desbordes) ===== */
+html{-webkit-text-size-adjust:100%}
+.mobile-topbar,.mobile-backdrop{display:none}
+@media (max-width:899px){
+  html{scroll-padding-top:calc(3.5rem + env(safe-area-inset-top))}
+  body{overflow-x:hidden;overflow-x:clip}
+  body.nav-open{overflow:hidden}
+  .progress{z-index:1002}
+  .layout{display:block;min-width:0}
+  .sidebar{position:fixed;top:0;left:0;height:100vh;height:100dvh;max-height:none;width:min(86vw,320px);
+    transform:translateX(-100%);visibility:hidden;transition:transform .25s ease,visibility 0s linear .25s;z-index:1001;
+    overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:rgba(4,8,18,.98);
+    border-right:1px solid var(--border);border-bottom:0;padding:calc(1.2rem + env(safe-area-inset-top)) 1rem calc(2rem + env(safe-area-inset-bottom));
+    box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .sidebar.open{transform:translateX(0);visibility:visible;transition:transform .25s ease}
+  .mobile-backdrop{display:block;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;opacity:0;pointer-events:none;transition:opacity .25s ease}
+  .mobile-backdrop.open{opacity:1;pointer-events:auto}
+  .mobile-topbar{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:999;
+    background:rgba(4,8,18,.95);border-bottom:1px solid var(--border);
+    padding:calc(.5rem + env(safe-area-inset-top)) calc(.75rem + env(safe-area-inset-right)) .5rem calc(.75rem + env(safe-area-inset-left))}
+  .mobile-topbar .mt-title{font-weight:900;font-size:1.05rem;color:var(--text)}
+  .mobile-topbar .mt-title span{color:var(--cyan)}
+  .hamburger{min-width:44px;min-height:44px;background:var(--panel2);border:1px solid var(--border);border-radius:.7rem;color:var(--text);font-size:1.4rem;padding:0;cursor:pointer;touch-action:manipulation}
+  .hamburger:focus-visible{outline:2px solid var(--magenta);outline-offset:2px}
+  main{max-width:100%;min-width:0;padding:1.2rem max(1rem,env(safe-area-inset-right)) 4rem max(1rem,env(safe-area-inset-left))}
+  h1{font-size:clamp(1.7rem,8vw,3rem)}
+  h2{font-size:clamp(1.25rem,5.5vw,2rem)}
+  h3{font-size:clamp(1.05rem,4.5vw,1.5rem)}
+  h1,h2,h3,p,li{overflow-wrap:anywhere}
+  code{overflow-wrap:anywhere}
+  pre{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  pre code{white-space:pre;overflow-wrap:normal}
+  svg,canvas{max-width:100%;height:auto}
+  .btn,.gate-btn,.nav-link,select,input[type=text],input[type=number]{min-height:44px;touch-action:manipulation}
+  .btn,.gate-btn{padding:.65rem 1rem}
+  .nav-link{padding:.75rem .8rem}
+  input,select,textarea{font-size:16px}
+  input[type=range]{min-height:44px;width:100%;touch-action:manipulation}
+  input[type=range]::-webkit-slider-thumb{width:24px;height:24px}
+  input[type=range]::-moz-range-thumb{width:24px;height:24px}
+  input[type=checkbox]{width:20px;height:20px}
+  .sim-layout,.grid2{grid-template-columns:1fr;gap:1rem}
+  .sim-layout>*,.grid2>*{min-width:0}
+  .truth-grid,.memory,.wave-cells,.electron-flow{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .log{max-height:120px;overflow-y:auto;overscroll-behavior:contain}
+  .card{backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none}
+  .level{content-visibility:auto;contain-intrinsic-size:1px 600px;scroll-margin-top:calc(3.5rem + env(safe-area-inset-top))}
+  h2,h3,.level-header{scroll-margin-top:calc(3.5rem + env(safe-area-inset-top))}
+}
+@media (hover:none){.btn:hover,.nav-link:hover,.gate-btn:hover{transform:none;box-shadow:none}}
+@media (prefers-reduced-motion:reduce){.sidebar,.mobile-backdrop{transition:none}}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#contenido">Saltar al contenido</a>
+<div class="progress"><div id="progressBar"></div></div>
+<div class="mobile-topbar" id="mobileTopbar">
+  <span class="mt-title">⚡ <span>FIFO</span> síncrono</span>
+  <button class="hamburger" id="hamburgerBtn" type="button" aria-label="Abrir menú de navegación" aria-expanded="false" aria-controls="sidebar">☰</button>
+</div>
+<div class="mobile-backdrop" id="mobileBackdrop"></div>
+<div class="layout">
+<aside class="sidebar" id="sidebar">
+  <div class="brand">⚡ <span>FIFO</span> síncrono</div>
+  <nav id="navList">
+    <a href="#nivel-0" class="nav-link"><span class="dot"></span>0 · Electricidad</a>
+    <a href="#nivel-1" class="nav-link"><span class="dot"></span>1 · Transistor a lógica</a>
+    <a href="#nivel-2" class="nav-link"><span class="dot"></span>2 · Lógica secuencial</a>
+    <a href="#nivel-3" class="nav-link"><span class="dot"></span>3 · FIFO síncrono</a>
+    <a href="#nivel-4" class="nav-link"><span class="dot"></span>4 · Verificación UVM</a>
+    <a href="#nivel-5" class="nav-link"><span class="dot"></span>5 · Cobertura y SVA</a>
+    <a href="#nivel-6" class="nav-link"><span class="dot"></span>6 · Nivel empresa</a>
+<a href="#nivel-7" class="nav-link"><span class="dot"></span>7 · Entrevista</a>
+  </nav>
+  <div style="margin-top:1.5rem;font-size:.8rem;color:var(--muted)">Puntuación total: <span id="totalScore">0</span></div>
+</aside>
+<main id="contenido">
+<header class="hero">
+  <h1>De la electricidad al verificador profesional</h1>
+  <p>Ruta interactiva de 8 niveles para dominar una FIFO síncrona real: del átomo a la verificación UVM, cobertura, aserciones y sign-off industrial.</p>
+  <a href="index.html">← Volver a la guía interactiva UVM</a>
+</header>
+
+<section id="nivel-0" class="level">
+<div class="level-header"><h2><span class="badge basico">Básico</span> Nivel 0 · Electricidad básica</h2></div>
+<div class="card">
+  <h3>Voltaje, corriente, resistencia</h3>
+  <p>El voltaje <b>V</b> empuja cargas; la corriente <b>I</b> es cuántas cargas pasan por segundo; la resistencia <b>R</b> se opone al paso. Ley de Ohm: <code>V = I · R</code>. Potencia: <code>P = V·I = I²R</code>. Un <b>divisor de tensión</b> con dos resistencias da <code>Vout = Vin · R2/(R1+R2)</code>.</p>
+  <div class="electron-flow" aria-hidden="true"><span class="electron"></span><span class="electron"></span><span class="electron"></span><span class="electron"></span><span class="electron"></span><span class="electron"></span><span class="electron"></span></div>
+  <div class="grid2">
+    <div>
+      <label for="voltSlider">Voltaje: <span id="voltVal">6</span> V</label><br>
+      <input type="range" id="voltSlider" min="0" max="12" step="0.1" value="6"><br>
+      <label for="resSlider">Resistencia: <span id="resVal">100</span> Ω</label><br>
+      <input type="range" id="resSlider" min="10" max="1000" step="1" value="100">
+      <p>Corriente: <b id="ampOut">60</b> mA<br>Potencia: <b id="potOut">360</b> mW</p>
+    </div>
+    <div>
+      <h4>Ejemplo LED + resistor</h4>
+      <p>Fuente 5 V, el LED cae ~2 V. El resistor limita la corriente.</p>
+      <label for="ledResSlider">Resistor: <span id="ledResVal">330</span> Ω</label>
+      <input type="range" id="ledResSlider" min="100" max="1000" value="330">
+      <p>Corriente LED: <b id="ledIOut">9.1</b> mA (seguro para un LED típico de 5–20 mA)</p>
+    </div>
+  </div>
+</div>
+<div class="quiz">
+  <h4>Quiz nivel 0</h4>
+  <div class="q">
+    <p>Si V = 12 V y R = 4 Ω, ¿cuál es la corriente?</p>
+    <button class="btn opt" data-correct="0">0.33 A</button>
+    <button class="btn opt" data-correct="1">3 A</button>
+    <button class="btn opt" data-correct="0">48 A</button>
+    <div class="feedback"></div>
+  </div>
+  <div class="q">
+    <p>En un divisor de tensión con R1 = R2, la salida en el punto medio es…</p>
+    <button class="btn opt" data-correct="1">Vin / 2</button>
+    <button class="btn opt" data-correct="0">Vin</button>
+    <button class="btn opt" data-correct="0">0 V</button>
+    <div class="feedback"></div>
+  </div>
+</div>
+</section>
+
+<section id="nivel-1" class="level">
+<div class="level-header"><h2><span class="badge basico">Básico</span> Nivel 1 · Del transistor a la lógica</h2></div>
+<div class="card">
+  <h3>Transistor como interruptor, CMOS</h3>
+  <p>Un MOSFET en corte bloquea (interruptor abierto); en conducción conecta (interruptor cerrado). CMOS usa un NMOS abajo y un PMOS arriba: nunca conducen ambos a la vez, por eso el consumo estático es muy bajo.</p>
+  <p>Compuertas: <b>AND</b>, <b>OR</b>, <b>NOT</b> y <b>NAND</b>. NAND y NOR son universales: con ellas se construye cualquier lógica.</p>
+</div>
+<div class="card">
+  <h3>Tabla de verdad interactiva</h3>
+  <p>Elige la compuerta y alterna A y B.</p>
+  <div>
+    <button class="btn gate-btn active" data-gate="AND">AND</button>
+    <button class="btn gate-btn" data-gate="OR">OR</button>
+    <button class="btn gate-btn" data-gate="NAND">NAND</button>
+    <button class="btn gate-btn" data-gate="NOT">NOT</button>
+  </div>
+  <p>A: <button class="btn" id="inputA">0</button> B: <button class="btn" id="inputB">0</button> Salida: <b id="gateOut">0</b></p>
+  <div class="truth-grid" id="truthTable"></div>
+</div>
+<div class="card">
+  <h3>Niveles lógicos y ruido</h3>
+  <p>Un 0 lógico suele ser &lt; 0.3·VDD y un 1 lógico &gt; 0.7·VDD. El <b>margen de ruido</b> es la diferencia entre lo que una salida garantiza y lo que la entrada siguiente exige.</p>
+</div>
+<div class="quiz">
+  <h4>Quiz nivel 1</h4>
+  <div class="q">
+    <p>En una compuerta NAND con A=1 y B=0, la salida es…</p>
+    <button class="btn opt" data-correct="1">1</button>
+    <button class="btn opt" data-correct="0">0</button>
+    <button class="btn opt" data-correct="0">Indeterminada</button>
+    <div class="feedback"></div>
+  </div>
+  <div class="q">
+    <p>Un transistor MOS en corte se comporta como…</p>
+    <button class="btn opt" data-correct="1">Un interruptor abierto</button>
+    <button class="btn opt" data-correct="0">Un interruptor cerrado</button>
+    <button class="btn opt" data-correct="0">Una resistencia de 0 Ω</button>
+    <div class="feedback"></div>
+  </div>
+</div>
+</section>
+
+<section id="nivel-2" class="level">
+<div class="level-header"><h2><span class="badge intermedio">Intermedio</span> Nivel 2 · Lógica secuencial</h2></div>
+<div class="card">
+  <h3>Latch, flip-flop D, reloj</h3>
+  <p>Un latch es sensible al nivel; un flip-flop D captura la entrada solo en el flanco del reloj y guarda 1 bit. Una memoria es un array de esos bits.</p>
+  <p><b>Setup</b>: D debe estar estable antes del flanco. <b>Hold</b>: D debe seguir estable después. El <b>reset asíncrono</b> (el de <code>sync_fifo.sv</code>) actúa al instante con <code>rst_n</code>; el síncrono solo se evalúa en el flanco.</p>
+  <svg width="100%" viewBox="0 0 520 160" role="img" aria-label="Diagrama de tiempos de reloj, D y Q">
+    <text x="10" y="30" fill="#9fb2cc" font-size="12">clk</text>
+    <path d="M40 40 L40 15 L100 15 L100 40 L160 40 L160 15 L220 15 L220 40 L280 40 L280 15 L340 15 L340 40 L400 40 L400 15 L460 15 L460 40" fill="none" stroke="#22d3ee" stroke-width="2"/>
+    <text x="10" y="90" fill="#e879f9" font-size="12">D</text>
+    <path d="M40 100 L40 75 L130 75 L130 100 L250 100 L250 75 L430 75" fill="none" stroke="#e879f9" stroke-width="2"/>
+    <text x="10" y="145" fill="#a3e635" font-size="12">Q</text>
+    <path d="M40 150 L40 125 L160 125 L160 125 L160 150 L280 150 L280 125 L460 125" fill="none" stroke="#a3e635" stroke-width="2"/>
+    <line x1="160" y1="10" x2="160" y2="155" stroke="#fbbf24" stroke-dasharray="3 3"/>
+    <text x="165" y="68" fill="#fbbf24" font-size="10">flanco: Q toma D</text>
+  </svg>
+</div>
+<div class="quiz">
+  <h4>Quiz nivel 2</h4>
+  <div class="q">
+    <p>¿Qué almacena un flip-flop D?</p>
+    <button class="btn opt" data-correct="1">1 bit</button>
+    <button class="btn opt" data-correct="0">1 byte</button>
+    <button class="btn opt" data-correct="0">Depende del reloj</button>
+    <div class="feedback"></div>
+  </div>
+  <div class="q">
+    <p>El tiempo de setup exige que D esté estable…</p>
+    <button class="btn opt" data-correct="1">Antes del flanco</button>
+    <button class="btn opt" data-correct="0">Después del flanco</button>
+    <button class="btn opt" data-correct="0">Solo durante el reset</button>
+    <div class="feedback"></div>
+  </div>
+</div>
+</section>
+
+<section id="nivel-3" class="level">
+<div class="level-header"><h2><span class="badge intermedio">Intermedio</span> Nivel 3 · La FIFO síncrona</h2></div>
+<div class="card">
+  <h3>Concepto y punteros</h3>
+  <p>Una FIFO es una cola: el primer dato escrito es el primero leído. Con punteros que se envuelven (wrap-around), <code>wr_ptr == rd_ptr</code> significa tanto vacía como llena. La solución: <b>un bit extra</b> en cada puntero. Si los bits bajos coinciden y el bit alto difiere, está <b>llena</b>; si todo coincide, está <b>vacía</b>.</p>
+  <p>En este RTL, <code>rd_data</code> es combinacional (<code>mem[rd_ptr]</code>): el dato de la cabeza está disponible sin esperar al flanco.</p>
+</div>
+<div class="card">
+  <h3>Código SystemVerilog real del repo</h3>
+<pre><code class="code-sv">module sync_fifo #(
+  parameter int WIDTH = 8,
+  parameter int DEPTH = 16          // must be a power of two
+) (
+  input  logic             clk,
+  input  logic             rst_n,
+  input  logic             wr_en,
+  input  logic [WIDTH-1:0] wr_data,
+  output logic             full,
+  input  logic             rd_en,
+  output logic [WIDTH-1:0] rd_data,
+  output logic             empty
+);
+  localparam int AW = $clog2(DEPTH);
+  logic [WIDTH-1:0] mem [DEPTH];
+  logic [AW:0]      wr_ptr, rd_ptr;
+  assign empty   = (wr_ptr == rd_ptr);
+  assign full    = (wr_ptr[AW] != rd_ptr[AW]) && (wr_ptr[AW-1:0] == rd_ptr[AW-1:0]);
+  assign rd_data = mem[rd_ptr[AW-1:0]];
+  wire do_wr = wr_en && !full;
+  wire do_rd = rd_en && !empty;
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      wr_ptr &lt;= '0;
+      rd_ptr &lt;= '0;
+    end else begin
+      if (do_wr) begin
+        mem[wr_ptr[AW-1:0]] &lt;= wr_data;
+        wr_ptr &lt;= wr_ptr + 1'b1;
+      end
+      if (do_rd) rd_ptr &lt;= rd_ptr + 1'b1;
+    end
+  end
+endmodule</code></pre>
+</div>
+<div class="card">
+  <h3>Simulador interactivo del RTL</h3>
+  <p>Pulsa Escribir/Leer para armar las entradas del próximo ciclo y luego <b>Paso reloj</b>. El scoreboard compara cada lectura contra una cola de referencia.</p>
+  <div class="sim-layout">
+    <div>
+      <label>DEPTH <select id="depthSelect"><option value="2">2</option><option value="4">4</option><option value="8" selected>8</option></select></label>
+      <label>Dato <input type="number" id="dataInput" min="0" max="255" value="170"></label>
+      <div>
+        <button class="btn" id="btnWrite">Escribir (wr_en)</button>
+        <button class="btn" id="btnRead">Leer (rd_en)</button>
+        <button class="btn primary" id="btnStep">Paso reloj</button>
+        <button class="btn reset" id="btnReset">Reset</button>
+      </div>
+      <label style="font-size:.9rem"><input type="checkbox" id="autoMode"> Auto aleatorio</label>
+      <button class="btn" id="btnAuto20">Correr 20 ciclos</button>
+      <p style="font-size:.85rem;color:var(--muted)">Entradas armadas: wr_en=<b id="pendWr">0</b> rd_en=<b id="pendRd">0</b></p>
+    </div>
+    <div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
+        <div class="flag" id="flagFull">FULL: 0</div>
+        <div class="flag on" id="flagEmpty">EMPTY: 1</div>
+        <div>wr_ptr <b id="wrPtrVal">0</b> · rd_ptr <b id="rdPtrVal">0</b></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem;margin:.7rem 0">
+        <div class="occbar"><div id="occBarFill"></div></div>
+        <span id="occText">0/8</span>
+      </div>
+      <div class="memory" id="memorySlots"></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:.8rem 0">
+    <strong>Scoreboard:</strong> <span id="sbPass" style="color:var(--lime)">0 PASS</span> <span id="sbFail" style="color:var(--red)">0 FAIL</span>
+  </div>
+  <div class="log" id="log" aria-live="polite"></div>
+  <h4>Forma de onda (últimos 20 ciclos)</h4>
+  <div id="waveContainer"></div>
+</div>
+<div class="quiz">
+  <h4>Quiz nivel 3</h4>
+  <div class="q">
+    <p>¿Para qué sirve el bit extra en los punteros?</p>
+    <button class="btn opt" data-correct="1">Distinguir llena de vacía</button>
+    <button class="btn opt" data-correct="0">Aumentar la velocidad</button>
+    <button class="btn opt" data-correct="0">Guardar datos extra</button>
+    <div class="feedback"></div>
+  </div>
+  <div class="q">
+    <p>En este RTL, escribir con la FIFO llena…</p>
+    <button class="btn opt" data-correct="1">Se ignora sin corromper datos</button>
+    <button class="btn opt" data-correct="0">Pisa el dato más viejo</button>
+    <button class="btn opt" data-correct="0">Avanza wr_ptr igualmente</button>
+    <div class="feedback"></div>
+  </div>
+  <div class="q">
+    <p>Leer con la FIFO vacía…</p>
+    <button class="btn opt" data-correct="0">Devuelve siempre un 0 y avanza rd_ptr</button>
+    <button class="btn opt" data-correct="1">Se ignora: rd_ptr no avanza</button>
+    <button class="btn opt" data-correct="0">Reinicia la FIFO</button>
+    <div class="feedback"></div>
+  </div>
+</div>
+</section>
+
+<section id="nivel-4" class="level">
+<div class="level-header"><h2><span class="badge avanzado">Avanzado</span> Nivel 4 · Verificación con UVM</h2></div>
+<div class="card">
+  <h3>Arquitectura del testbench</h3>
+  <p>UVM separa capas: el <b>agent</b> agrupa driver, monitor y sequencer; el <b>scoreboard</b> compara contra un modelo de referencia; el <b>coverage</b> mide qué casos se ejercitaron. La <b>factory</b> permite sustituir componentes, <b>config_db</b> lleva la virtual interface y las <b>objections</b> deciden cuándo termina el test. Con <b>constrained-random</b> se generan miles de escenarios legales.</p>
+  <p>Haz clic (o Enter) en un bloque para ver su rol y su archivo.</p>
+  <div style="overflow-x:auto">
+  <svg id="uvmSvg" width="100%" viewBox="0 0 700 320" role="group" aria-label="Arquitectura UVM clickable" style="min-width:620px">
+    <g class="arch" tabindex="0" data-info="Tests: smoke, fill/drain, overflow/underflow, lectura+escritura simultánea y random. Levantan objections y arrancan sequences." data-file="tb/fifo_tests.sv"><rect x="10" y="20" width="120" height="50" rx="10" class="svg-node"/><text x="70" y="50" text-anchor="middle" fill="#e6f1ff" font-size="13">Test</text></g>
+    <g class="arch" tabindex="0" data-info="Env: instancia el agent, el scoreboard y el coverage y conecta los analysis ports." data-file="tb/fifo_env.sv"><rect x="170" y="20" width="120" height="50" rx="10" class="svg-node"/><text x="230" y="50" text-anchor="middle" fill="#e6f1ff" font-size="13">Env</text></g>
+    <g class="arch" tabindex="0" data-info="Agent: agrupa driver, monitor y sequencer. Puede ser activo o pasivo." data-file="tb/fifo_agent.sv"><rect x="170" y="120" width="120" height="50" rx="10" class="svg-node"/><text x="230" y="150" text-anchor="middle" fill="#e6f1ff" font-size="13">Agent</text></g>
+    <g class="arch" tabindex="0" data-info="Sequences: secuencias reutilizables (fill, drain, random con pesos wr/rd)." data-file="tb/fifo_sequences.sv"><rect x="10" y="120" width="120" height="50" rx="10" class="svg-node"/><text x="70" y="150" text-anchor="middle" fill="#e6f1ff" font-size="13">Sequences</text></g>
+    <g class="arch" tabindex="0" data-info="Driver: convierte items en actividad de pines sobre la interface." data-file="tb/fifo_driver.sv"><rect x="170" y="220" width="120" height="50" rx="10" class="svg-node"/><text x="230" y="250" text-anchor="middle" fill="#e6f1ff" font-size="13">Driver</text></g>
+    <g class="arch" tabindex="0" data-info="Monitor: observa la interface cada ciclo y publica items por el analysis port." data-file="tb/fifo_monitor.sv"><rect x="340" y="220" width="120" height="50" rx="10" class="svg-node"/><text x="400" y="250" text-anchor="middle" fill="#e6f1ff" font-size="13">Monitor</text></g>
+    <g class="arch" tabindex="0" data-info="Scoreboard: modelo de referencia con una cola; comprueba datos y flags." data-file="tb/fifo_scoreboard.sv"><rect x="340" y="20" width="130" height="50" rx="10" class="svg-node"/><text x="405" y="50" text-anchor="middle" fill="#e6f1ff" font-size="13">Scoreboard</text></g>
+    <g class="arch" tabindex="0" data-info="Coverage: covergroups de wr_en, rd_en, full, empty, ocupación y cruces." data-file="tb/fifo_coverage.sv"><rect x="510" y="20" width="130" height="50" rx="10" class="svg-node"/><text x="575" y="50" text-anchor="middle" fill="#e6f1ff" font-size="13">Coverage</text></g>
+    <g class="arch" tabindex="0" data-info="Interface: señales y clocking blocks compartidos por TB y DUT." data-file="tb/fifo_if.sv"><rect x="340" y="120" width="120" height="50" rx="10" class="svg-node"/><text x="400" y="150" text-anchor="middle" fill="#e6f1ff" font-size="13">Interface</text></g>
+    <g class="arch" tabindex="0" data-info="DUT: la FIFO síncrona bajo prueba." data-file="rtl/sync_fifo.sv"><rect x="510" y="120" width="130" height="50" rx="10" class="svg-node"/><text x="575" y="150" text-anchor="middle" fill="#e6f1ff" font-size="13">DUT</text></g>
+    <g stroke="#22d3ee" stroke-width="1.5" fill="none">
+      <line x1="130" y1="45" x2="170" y2="45"/><line x1="230" y1="70" x2="230" y2="120"/><line x1="130" y1="145" x2="170" y2="145"/>
+      <line x1="230" y1="170" x2="230" y2="220"/><line x1="290" y1="245" x2="340" y2="245"/><line x1="290" y1="45" x2="340" y2="45"/>
+      <line x1="470" y1="45" x2="510" y2="45"/><line x1="460" y1="145" x2="510" y2="145"/><line x1="400" y1="170" x2="400" y2="220"/>
+    </g>
+  </svg>
+  </div>
+  <div id="uvmInfo" class="card" style="margin-top:.8rem" aria-live="polite">Selecciona un bloque para ver su rol y el archivo del repo.</div>
+</div>
+<div class="quiz">
+  <h4>Quiz nivel 4</h4>
+  <div class="q">
+    <p>¿Qué componente UVM agrupa driver, monitor y sequencer?</p>
+    <button class="btn opt" data-correct="1">Agent</button>
+    <button class="btn opt" data-correct="0">Env</button>
+    <button class="btn opt" data-correct="0">Scoreboard</button>
+    <div class="feedback"></div>
+  </div>
+  <div class="q">
+    <p>La virtual interface se transporta normalmente con…</p>
+    <button class="btn opt" data-correct="0">La factory</button>
+    <button class="btn opt" data-correct="1">uvm_config_db</button>
+    <button class="btn opt" data-correct="0">Una objection</button>
+    <div class="feedback"></div>
+  </div>
+</div>
+</section>
+
+<section id="nivel-5" class="level">
+<div class="level-header"><h2><span class="badge experto">Experto</span> Nivel 5 · Cobertura y aserciones</h2></div>
+<div class="card">
+  <h3>Covergroups (idea del testbench)</h3>
+  <p>La cobertura funcional responde: "¿ya probé esto?". Se cubren <code>wr_en</code>, <code>rd_en</code>, <code>full</code>, <code>empty</code>, la ocupación en bins y los cruces entre ellos.</p>
+<pre><code class="code-sv">covergroup fifo_cg;
+  cp_wr    : coverpoint wr_en;
+  cp_rd    : coverpoint rd_en;
+  cp_full  : coverpoint full;
+  cp_empty : coverpoint empty;
+  cp_occ   : coverpoint occupancy {
+    bins empty = {0};
+    bins low   = {[1 : DEPTH/4]};
+    bins mid   = {[DEPTH/4+1 : 3*DEPTH/4]};
+    bins high  = {[3*DEPTH/4+1 : DEPTH-1]};
+    bins full  = {DEPTH};
+  }
+  x_occ_ops : cross cp_occ, cp_wr, cp_rd;
+endgroup</code></pre>
+</div>
+<div class="card">
+  <h3>4 propiedades SVA para este RTL</h3>
+<pre><code class="code-sv">// 1. full coincide con la definición por punteros
+a_full_def: assert property (@(posedge clk) disable iff (!rst_n)
+  full == ((wr_ptr[AW] != rd_ptr[AW]) && (wr_ptr[AW-1:0] == rd_ptr[AW-1:0])));
+
+// 2. escribir con la FIFO llena no mueve wr_ptr
+a_no_wr_full: assert property (@(posedge clk) disable iff (!rst_n)
+  (wr_en && full) |=> $stable(wr_ptr));
+
+// 3. leer con la FIFO vacía no mueve rd_ptr
+a_no_rd_empty: assert property (@(posedge clk) disable iff (!rst_n)
+  (rd_en && empty) |=> $stable(rd_ptr));
+
+// 4. si no está vacía, rd_data es la cabeza de la memoria
+a_head: assert property (@(posedge clk) disable iff (!rst_n)
+  !empty |-> rd_data == mem[rd_ptr[AW-1:0]]);</code></pre>
+</div>
+<div class="card">
+  <h3>Juego: cazar huecos de cobertura</h3>
+  <p>Lanza ciclos aleatorios sobre una FIFO de profundidad 8 y observa qué bins de ocupación se cubren. Con pocos ciclos casi nunca alcanzas <b>full</b>: por eso se usan tests dirigidos.</p>
+  <div>
+    <label>Ciclos: <input type="number" id="covCycles" min="1" max="2000" value="20"></label>
+    <button class="btn primary" id="btnRunCov">Lanzar</button>
+    <button class="btn reset" id="btnResetCov">Reiniciar</button>
+  </div>
+  <div style="margin:.6rem 0">
+    <span class="bin" data-bin="empty">empty</span>
+    <span class="bin" data-bin="low">low</span>
+    <span class="bin" data-bin="mid">mid</span>
+    <span class="bin" data-bin="high">high</span>
+    <span class="bin" data-bin="full">full</span>
+  </div>
+  <p>Cobertura: <b id="covPercent">0%</b> · Ocupación actual: <b id="covOcc">0</b></p>
+</div>
+<div class="quiz">
+  <h4>Quiz nivel 5</h4>
+  <div class="q">
+    <p>Un covergroup mide…</p>
+    <button class="btn opt" data-correct="1">Cobertura funcional</button>
+    <button class="btn opt" data-correct="0">Solo líneas de código ejecutadas</button>
+    <button class="btn opt" data-correct="0">La frecuencia máxima</button>
+    <div class="feedback"></div>
+  </div>
+  <div class="q">
+    <p>La propiedad a_no_wr_full afirma que…</p>
+    <button class="btn opt" data-correct="1">wr_ptr no avanza si hay wr_en con la FIFO llena</button>
+    <button class="btn opt" data-correct="0">La FIFO nunca se llena</button>
+    <button class="btn opt" data-correct="0">El dato escrito se pierde siempre</button>
+    <div class="feedback"></div>
+  </div>
+</div>
+</section>
+
+<section id="nivel-6" class="level">
+<div class="level-header"><h2><span class="badge experto">Experto</span> Nivel 6 · Nivel empresa</h2></div>
+<div class="card">
+  <h3>Regresiones, CI y sign-off</h3>
+  <p>En un flujo profesional se lanzan <b>regresiones</b> con muchas semillas para reproducir y cazar fallas raras; se integran en <b>CI</b> por cada commit; se siguen métricas (cobertura de código y funcional, tasa de bugs) y se cierra con un <b>sign-off checklist</b>: cobertura justificada, aserciones sin fallos, regresión limpia, revisión de diseño y verificador y evidencia archivada. La verificación <b>formal</b> complementa a la simulación probando propiedades de forma exhaustiva.</p>
+  <p>Cuando lectura y escritura usan relojes distintos (FIFO asíncrona), los punteros cruzan de dominio en <b>código Gray</b>: solo cambia un bit por paso, así un muestreo a mitad de transición nunca da un valor absurdo. Este es un resumen de prácticas generales de la industria.</p>
+</div>
+<div class="card">
+  <h3>Contador Gray interactivo</h3>
+  <p><code>gray = bin ^ (bin &gt;&gt; 1)</code>. Pulsa y comprueba que solo cambia un bit de la columna Gray.</p>
+  <p>Binario: <b id="grayBin">0000</b> → Gray: <b id="grayOut" style="color:var(--lime)">0000</b> · Bits que cambiaron en Gray: <b id="grayFlips">0</b></p>
+  <button class="btn primary" id="btnGrayStep">Incrementar</button>
+  <button class="btn reset" id="btnGrayReset">Reiniciar</button>
+</div>
+<div class="card">
+  <h3>Checklist de sign-off (marca lo que cumplirías)</h3>
+  <ul style="list-style:none;padding:0">
+    <li><label><input type="checkbox"> Cobertura funcional cerrada o justificada</label></li>
+    <li><label><input type="checkbox"> Cero aserciones fallando en regresión</label></li>
+    <li><label><input type="checkbox"> Regresión con ≥ N semillas sin fallos</label></li>
+    <li><label><input type="checkbox"> Bugs críticos cerrados y reverificados</label></li>
+    <li><label><input type="checkbox"> Revisión de plan de verificación y de código</label></li>
+    <li><label><input type="checkbox"> Propiedades críticas probadas con formal (CDC, overflow)</label></li>
+  </ul>
+</div>
+<div class="quiz">
+  <h4>Quiz nivel 6</h4>
+  <div class="q">
+    <p>¿Por qué se usa código Gray al cruzar punteros entre relojes?</p>
+    <button class="btn opt" data-correct="1">Cambia un solo bit por transición</button>
+    <button class="btn opt" data-correct="0">Es más rápido de sumar</button>
+    <button class="btn opt" data-correct="0">Ocupa menos bits</button>
+    <div class="feedback"></div>
+  </div>
+  <div class="q">
+    <p>Cambiar la semilla en una regresión sirve para…</p>
+    <button class="btn opt" data-correct="1">Explorar distintos estímulos aleatorios y reproducir fallas</button>
+    <button class="btn opt" data-correct="0">Cambiar el RTL</button>
+    <button class="btn opt" data-correct="0">Reiniciar la cobertura</button>
+    <div class="feedback"></div>
+  </div>
+</div>
+</section>
+
+<section id="nivel-7" class="level">
+<div class="level-header"><h2><span class="badge experto">Experto</span> Nivel 7 · Entrevista: preguntas difíciles y corner cases</h2></div>
+
+<div class="card">
+  <h3>Cómo estructurar tu respuesta</h3>
+  <ol class="iv-steps">
+    <li><b>Clarifica la spec</b>: pregunta qué se entiende por “full”, “empty”, latencia de lectura, reset y límites de burst.</li>
+    <li><b>Plan</b>: define casos dirigidos, aleatorios y métricas de cierre.</li>
+    <li><b>Checkers</b>: decide qué va a aserciones SVA y qué al scoreboard.</li>
+    <li><b>Cobertura</b>: bins de ocupación, full/empty, cruces wr/rd y alertas ante pasos vacíos.</li>
+    <li><b>Corner cases</b>: simultáneos rd+wr en full/empty, wrap-around, DEPTH extremos, reset en tráfico.</li>
+    <li><b>Debug</b>: reproduce con misma semilla, busca primer divergencia y no asumas que es el RTL.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>Filtros y búsqueda</h3>
+  <div class="iv-filters">
+    <div class="iv-chips" id="ivCatChips" role="group" aria-label="Filtrar por categoría">
+      <button type="button" class="iv-chip active" data-iv-cat="Todos">Todos</button>
+      <button type="button" class="iv-chip" data-iv-cat="SystemVerilog">SystemVerilog</button>
+      <button type="button" class="iv-chip" data-iv-cat="Constraints">Constraints</button>
+      <button type="button" class="iv-chip" data-iv-cat="UVM">UVM</button>
+      <button type="button" class="iv-chip" data-iv-cat="SVA">SVA</button>
+      <button type="button" class="iv-chip" data-iv-cat="Cobertura">Cobertura</button>
+      <button type="button" class="iv-chip" data-iv-cat="CDC/FIFO">CDC/FIFO</button>
+      <button type="button" class="iv-chip" data-iv-cat="Debug">Debug</button>
+      <button type="button" class="iv-chip" data-iv-cat="Diseño de TB">Diseño de TB</button>
+    </div>
+    <div class="iv-level-box">
+      <label for="ivLevelSelect">Nivel:</label>
+      <select id="ivLevelSelect">
+        <option value="todos">Todos</option>
+        <option value="1">1 · junior</option>
+        <option value="2">2 · intermedio</option>
+        <option value="3">3 · senior</option>
+      </select>
+    </div>
+    <input type="search" id="ivSearch" placeholder="Buscar pregunta o respuesta" aria-label="Buscar pregunta o respuesta">
+  </div>
+  <div class="iv-progress">
+    <span id="ivProgressText">0/0 dominadas</span>
+    <div class="iv-progress-track"><div id="ivProgressFill" class="iv-progress-fill"></div></div>
+  </div>
+  <div id="ivFlashList" class="iv-list"></div>
+</div>
+
+<div class="card">
+  <h3>Simulacro</h3>
+  <div class="iv-sim" id="ivSim">
+    <div class="iv-sim-start" id="ivSimStartBox">
+      <p>Pregunta aleatoria entre las no dominadas. 90 segundos para responder antes de revelar.</p>
+      <button type="button" class="btn primary" id="ivSimStart">Iniciar simulacro</button>
+    </div>
+    <div class="iv-hidden" id="ivSimQuiz" aria-live="polite">
+      <div class="iv-timer"><span id="ivSimTimer">90</span> s</div>
+      <p class="iv-sim-q" id="ivSimQ"></p>
+      <div class="iv-sim-actions">
+        <button type="button" class="btn iv-sim-reveal" id="ivSimReveal">Revelar respuesta</button>
+        <div class="iv-hidden iv-sim-grade" id="ivSimGrade">
+          <button type="button" class="btn correct" id="ivSimYes">Sí lo sabía</button>
+          <button type="button" class="btn incorrect" id="ivSimNo">No</button>
+        </div>
+      </div>
+      <div class="iv-hidden iv-sim-answer" id="ivSimAnswer"></div>
+      <button type="button" class="btn iv-hidden" id="ivSimNext">Otra pregunta</button>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Checklist de corner cases del FIFO</h3>
+  <ul class="iv-checklist" id="ivChecklist">
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk1"><span><b>Reset asíncrono en tráfico</b> — punteros a 0, empty=1, full=0; test dirigido con rst_n durante wr/rd.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk2"><span><b>Write con full se ignora</b> — wr_ptr estable; SVA <code>wr_en &amp;&amp; full |=&gt; $stable(wr_ptr)</code>.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk3"><span><b>Read con empty se ignora</b> — rd_ptr estable; SVA <code>rd_en &amp;&amp; empty |=&gt; $stable(rd_ptr)</code>.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk4"><span><b>Simultáneo wr+rd en full</b> — write descartado, read aceptado; test dirigido y scoreboard que ignora el write.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk5"><span><b>Simultáneo wr+rd en empty</b> — read descartado, write aceptado; test dirigido y scoreboard que no hace pop.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk6"><span><b>Wrap-around de punteros</b> — llenar/vaciar más de una vuelta; secuencia larga y verificación de orden.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk7"><span><b>DEPTH=1</b> — el bit extra no detecta full; documentar exclusión o test que falle si se permite profundidad 1.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk8"><span><b>FWFT combinacional</b> — <code>rd_data</code> disponible sin flanco; SVA <code>!empty |-> rd_data == mem[rd_ptr]</code>.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk9"><span><b>Integridad y orden de datos</b> — N writes y N reads; scoreboard con cola de referencia compara secuencia exacta.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk10"><span><b>Overflow / underflow</b> — writes con full y reads con empty; contadores en monitor y asserts de no avance.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk11"><span><b>Cobertura full/empty</b> — bins <code>empty/low/mid/high/full</code> y cruce <code>occ × wr/rd</code> para cerrar extremos.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk12"><span><b>X-propagation en memoria</b> — no leer ubicaciones no escritas; revisar reset y secuencia que solo lee tras write válido.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk13"><span><b>full y empty simultáneos</b> — illegal_bin; SVA <code>not (full &amp;&amp; empty)</code>; test de arranque y tras reset.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk14"><span><b>Reset deassertion y primer acceso</b> — secuencia reset → write → read; verificar punteros y primer dato.</span></label></li>
+    <li class="iv-check-item"><label class="iv-check-label"><input type="checkbox" class="iv-checkbox" data-iv-id="chk15"><span><b>Barrido de semillas</b> — regresión multi-seed para cazar dependencias raras de aleatoriedad.</span></label></li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>Fuentes de inspiración</h3>
+  <ul class="iv-src">
+    <li><a href="https://verificationacademy.com/forums/t/constraint-randomization-interview-question/39874" target="_blank" rel="noopener">Verification Academy: constraint randomization interview question</a></li>
+    <li><a href="https://verificationacademy.com/forums/t/constraint-interview-question/44844" target="_blank" rel="noopener">Verification Academy: constraint interview question</a></li>
+    <li><a href="https://www.compoundlearn.ai/questions/verification-engineer-interview-questions" target="_blank" rel="noopener">CompoundLearn: verification engineer interview questions</a></li>
+    <li><a href="https://vlsiweb.com/design-verification-interview-questions/" target="_blank" rel="noopener">VLSIweb: design verification interview questions</a></li>
+    <li><a href="https://vlsiverify.com/interview-questions/systemverilog-interview-questions/" target="_blank" rel="noopener">VLSI Verify: SystemVerilog interview questions</a></li>
+  </ul>
+</div>
+</section>
+
+<footer style="border-top:1px solid var(--border);padding:2rem 0;color:var(--muted);text-align:center">
+  <p><a href="index.html">← Guía interactiva UVM</a> · Curso de FIFO síncrona</p>
+</footer>
+</main>
+</div>
+
+<script>
+"use strict";
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+
+/* ---------- resaltado de código (una sola pasada) ---------- */
+function highlight(el){
+  const esc = el.textContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const kw = 'module|endmodule|parameter|localparam|input|output|logic|assign|always_ff|if|else|begin|end|wire|int|posedge|negedge|or|covergroup|endgroup|coverpoint|bins|cross|assert|property|disable|iff';
+  const re = new RegExp("(\\/\\/.*$)|('(?:[^'\\n])*')|\\b("+kw+")\\b|(\\b\\d+'[bhdo][0-9a-fA-F_]+\\b|\\b\\d+\\b)", 'gm');
+  el.innerHTML = esc.replace(re, (m,c,s,k,n)=>{
+    if(c) return '<span class="tok-c">'+c+'</span>';
+    if(s && /^'[bhdo0-9]/.test(s) && s.length<4) return m;
+    if(s) return '<span class="tok-s">'+s+'</span>';
+    if(k) return '<span class="tok-k">'+k+'</span>';
+    return '<span class="tok-n">'+n+'</span>';
+  });
+}
+$$('.code-sv').forEach(highlight);
+
+/* ---------- nivel 0 ---------- */
+function calcOhm(){
+  const V = parseFloat($('#voltSlider').value), R = parseFloat($('#resSlider').value);
+  $('#voltVal').textContent = V.toFixed(1); $('#resVal').textContent = R;
+  const I = V / R;
+  $('#ampOut').textContent = (I*1000).toFixed(1);
+  $('#potOut').textContent = (V*I*1000).toFixed(1);
+}
+function calcLed(){
+  const R = parseFloat($('#ledResSlider').value);
+  $('#ledResVal').textContent = R;
+  $('#ledIOut').textContent = ((5-2)/R*1000).toFixed(1);
+}
+$('#voltSlider').addEventListener('input', calcOhm);
+$('#resSlider').addEventListener('input', calcOhm);
+$('#ledResSlider').addEventListener('input', calcLed);
+calcOhm(); calcLed();
+
+/* ---------- nivel 1 ---------- */
+let gate = 'AND', gA = 0, gB = 0;
+function gateEval(g,a,b){
+  if(g==='AND') return a & b;
+  if(g==='OR') return a | b;
+  if(g==='NAND') return (a & b) ^ 1;
+  return a ^ 1; // NOT usa solo A
+}
+function renderTruth(){
+  const t = $('#truthTable');
+  t.innerHTML = '<b>Puerta</b><b>A</b><b>B</b><b>Out</b>';
+  [[0,0],[0,1],[1,0],[1,1]].forEach(([x,y])=>{
+    const on = (x===gA && y===gB);
+    const st = on ? ' style="background:rgba(34,211,238,.2);border-radius:.3rem"' : '';
+    t.insertAdjacentHTML('beforeend','<span'+st+'>'+gate+'</span><span'+st+'>'+x+'</span><span'+st+'>'+y+'</span><span'+st+'><b style="color:var(--lime)">'+gateEval(gate,x,y)+'</b></span>');
+  });
+  $('#gateOut').textContent = gateEval(gate,gA,gB);
+}
+$$('.gate-btn').forEach(b=>b.addEventListener('click',()=>{
+  $$('.gate-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+  gate = b.dataset.gate; renderTruth();
+}));
+$('#inputA').addEventListener('click',()=>{ gA ^= 1; $('#inputA').textContent = gA; renderTruth(); });
+$('#inputB').addEventListener('click',()=>{ gB ^= 1; $('#inputB').textContent = gB; renderTruth(); });
+renderTruth();
+
+/* ---------- nivel 3: simulador (modelo exacto del RTL) ---------- */
+const HIST = 20;
+let depth = 8, mem = [], valid = [], wrPtr = 0, rdPtr = 0;
+let pendWr = 0, pendRd = 0, pendData = 0;
+let ref = [], pass = 0, fail = 0, hist = [], cycle = 0, auto = false;
+
+const isEmpty = () => wrPtr === rdPtr;
+const isFull  = () => (Math.floor(wrPtr/depth)%2 !== Math.floor(rdPtr/depth)%2) && (wrPtr%depth === rdPtr%depth);
+const occupancy = () => (wrPtr - rdPtr + 2*depth) % (2*depth);
+
+function buildWave(){
+  const c = $('#waveContainer'); c.innerHTML = '';
+  ['wr_en','rd_en','full','empty','occ'].forEach(sig=>{
+    const row = document.createElement('div'); row.className = 'wave-row';
+    row.innerHTML = '<span class="wave-label">'+sig+'</span><div class="wave-cells"></div>';
+    const cells = row.querySelector('.wave-cells');
+    for(let i=0;i<HIST;i++){
+      const d = document.createElement('div'); d.className = 'wcell'; d.dataset.sig = sig; cells.appendChild(d);
+    }
+    c.appendChild(row);
+  });
+}
+function drawWave(){
+  ['wr_en','rd_en','full','empty','occ'].forEach(sig=>{
+    $$('.wcell[data-sig="'+sig+'"]').forEach((cell,i)=>{
+      const h = hist[i - (HIST - hist.length)];
+      if(!h){ cell.textContent = ''; cell.className = 'wcell'; return; }
+      const v = h[sig];
+      cell.textContent = v;
+      if(sig==='occ') cell.className = 'wcell' + (v>0 ? ' mid' : '');
+      else cell.className = 'wcell' + (v ? (sig==='full'||sig==='empty' ? ' full' : ' high') : '');
+    });
+  });
+}
+function render(){
+  const occ = occupancy();
+  $('#flagFull').textContent = 'FULL: ' + (isFull()?1:0);
+  $('#flagEmpty').textContent = 'EMPTY: ' + (isEmpty()?1:0);
+  $('#flagFull').classList.toggle('on', isFull());
+  $('#flagEmpty').classList.toggle('on', isEmpty());
+  $('#wrPtrVal').textContent = wrPtr; $('#rdPtrVal').textContent = rdPtr;
+  $('#occBarFill').style.width = (occ/depth*100)+'%';
+  $('#occText').textContent = occ+'/'+depth;
+  $('#sbPass').textContent = pass+' PASS'; $('#sbFail').textContent = fail+' FAIL';
+  $('#pendWr').textContent = pendWr; $('#pendRd').textContent = pendRd;
+  const m = $('#memorySlots'); m.innerHTML = '';
+  for(let i=0;i<depth;i++){
+    const s = document.createElement('div');
+    s.className = 'slot' + (i===wrPtr%depth?' wr':'') + (i===rdPtr%depth?' rd':'');
+    s.innerHTML = '<span class="idx">'+i+(i===wrPtr%depth?' wr':'')+(i===rdPtr%depth?' rd':'')+'</span><span class="val">'+(valid[i]?mem[i]:'--')+'</span>';
+    m.appendChild(s);
+  }
+  drawWave();
+}
+function log(msg){
+  const d = document.createElement('div'); d.textContent = '['+cycle+'] '+msg;
+  $('#log').prepend(d);
+  while($('#log').children.length > 30) $('#log').lastChild.remove();
+}
+function reset(){
+  mem = new Array(depth).fill(0); valid = new Array(depth).fill(false);
+  wrPtr = rdPtr = 0; pendWr = pendRd = 0; ref = []; pass = fail = 0; hist = []; cycle = 0;
+  buildWave(); $('#log').innerHTML = ''; render(); log('rst_n=0: punteros a 0, FIFO vacía');
+}
+function step(){
+  if(auto){ pendWr = Math.random()<.55?1:0; pendRd = Math.random()<.45?1:0; pendData = Math.floor(Math.random()*256); }
+  const full = isFull(), empty = isEmpty();
+  const doWr = pendWr && !full, doRd = pendRd && !empty;
+  cycle++;
+  if(doRd){
+    const got = mem[rdPtr%depth], exp = ref.shift();
+    if(got === exp){ pass++; log('READ  '+got+' (esperado '+exp+') PASS'); }
+    else { fail++; log('READ  '+got+' (esperado '+exp+') FAIL'); }
+    valid[rdPtr%depth] = false;
+  }
+  if(doWr){
+    mem[wrPtr%depth] = pendData; valid[wrPtr%depth] = true; ref.push(pendData);
+    log('WRITE '+pendData+' en slot '+(wrPtr%depth));
+  }
+  if(pendWr && full) log('write ignorado (full)');
+  if(pendRd && empty) log('read ignorado (empty)');
+  if(doWr && doRd) log('rd+wr simultáneos');
+  if(doWr) wrPtr = (wrPtr+1) % (2*depth);
+  if(doRd) rdPtr = (rdPtr+1) % (2*depth);
+  hist.push({wr_en:pendWr, rd_en:pendRd, full:isFull()?1:0, empty:isEmpty()?1:0, occ:occupancy()});
+  if(hist.length > HIST) hist.shift();
+  if(!auto){ pendWr = 0; pendRd = 0; }
+  render();
+}
+$('#depthSelect').addEventListener('change', e=>{ depth = parseInt(e.target.value,10); reset(); });
+$('#btnWrite').addEventListener('click', ()=>{
+  pendWr = 1; pendData = Math.max(0, Math.min(255, parseInt($('#dataInput').value,10) || 0)); render();
+});
+$('#btnRead').addEventListener('click', ()=>{ pendRd = 1; render(); });
+$('#btnStep').addEventListener('click', step);
+$('#btnReset').addEventListener('click', reset);
+$('#autoMode').addEventListener('change', e=>{ auto = e.target.checked; });
+$('#btnAuto20').addEventListener('click', ()=>{
+  const prev = auto; auto = true;
+  for(let i=0;i<20;i++) step();
+  auto = prev; pendWr = pendRd = 0; render();
+});
+reset();
+
+/* ---------- nivel 4: diagrama UVM ---------- */
+$$('.arch').forEach(g=>{
+  const show = ()=>{ $('#uvmInfo').innerHTML = '<b>'+g.querySelector('text').textContent+'</b> — <code></code><br>'+g.dataset.info;
+    $('#uvmInfo code').textContent = g.dataset.file; };
+  g.addEventListener('click', show);
+  g.addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); show(); }});
+});
+
+/* ---------- nivel 5: juego de cobertura ---------- */
+let cOcc = 0; const cBins = {empty:0, low:0, mid:0, high:0, full:0};
+function drawCov(){
+  let n = 0;
+  $$('.bin').forEach(b=>{ const on = cBins[b.dataset.bin] > 0; b.classList.toggle('filled', on); if(on) n++; });
+  $('#covPercent').textContent = Math.round(n/5*100)+'%'; $('#covOcc').textContent = cOcc;
+}
+$('#btnRunCov').addEventListener('click', ()=>{
+  const n = Math.max(1, Math.min(2000, parseInt($('#covCycles').value,10) || 20));
+  for(let i=0;i<n;i++){
+    const w = Math.random()<.5, r = Math.random()<.5;
+    const dw = w && cOcc < 8, dr = r && cOcc > 0;
+    if(dw) cOcc++; if(dr) cOcc--;
+    const b = cOcc===0 ? 'empty' : cOcc<=2 ? 'low' : cOcc<=6 ? 'mid' : cOcc<=7 ? 'high' : 'full';
+    cBins[b]++;
+  }
+  drawCov();
+});
+$('#btnResetCov').addEventListener('click', ()=>{ cOcc = 0; for(const k in cBins) cBins[k] = 0; drawCov(); });
+drawCov();
+
+/* ---------- nivel 6: Gray ---------- */
+let gb = 0;
+function drawGray(prev){
+  const g = gb ^ (gb>>1), pg = prev===undefined ? g : prev ^ (prev>>1);
+  let x = g ^ pg, flips = 0; while(x){ flips += x&1; x >>= 1; }
+  $('#grayBin').textContent = gb.toString(2).padStart(4,'0');
+  $('#grayOut').textContent = g.toString(2).padStart(4,'0');
+  $('#grayFlips').textContent = flips;
+}
+$('#btnGrayStep').addEventListener('click', ()=>{ const p = gb; gb = (gb+1)&15; drawGray(p); });
+$('#btnGrayReset').addEventListener('click', ()=>{ gb = 0; drawGray(); });
+drawGray();
+
+/* ---------- quizzes ---------- */
+let total = 0;
+try{ total = parseInt(localStorage.getItem('fifoCursoScore')||'0',10) || 0; }catch(e){}
+$('#totalScore').textContent = total;
+$$('.q').forEach(q=>{
+  $$('.opt', q).forEach(btn=>btn.addEventListener('click', ()=>{
+    if(q.dataset.done) return; q.dataset.done = '1';
+    const ok = btn.dataset.correct === '1';
+    $$('.opt', q).forEach(b=>{ b.disabled = true; if(b.dataset.correct==='1') b.classList.add('correct'); });
+    if(!ok) btn.classList.add('incorrect');
+    $('.feedback', q).textContent = ok ? '✅ ¡Correcto!' : '❌ No es esa: mira la opción en verde.';
+    if(ok){ total++; $('#totalScore').textContent = total; try{ localStorage.setItem('fifoCursoScore', String(total)); }catch(e){} }
+  }));
+});
+
+/* ---------- scrollspy + progreso ---------- */
+const links = $$('.nav-link');
+window.addEventListener('scroll', ()=>{
+  const h = document.documentElement.scrollHeight - innerHeight;
+  $('#progressBar').style.width = (h>0 ? scrollY/h*100 : 0)+'%';
+}, {passive:true});
+if('IntersectionObserver' in window){
+  const io = new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting) links.forEach(l=>l.classList.toggle('active', l.getAttribute('href')==='#'+e.target.id));
+  }), {rootMargin:'-25% 0px -65% 0px'});
+  $$('.level').forEach(s=>io.observe(s));
+}
+</script>
+<script>
+(function(){
+  "use strict";
+  var sb=document.getElementById('sidebar'),btn=document.getElementById('hamburgerBtn'),bd=document.getElementById('mobileBackdrop');
+  if(!sb||!btn||!bd)return;
+  var links=sb.querySelectorAll('.nav-link');
+  function setOpen(o,focusBtn){
+    sb.classList.toggle('open',o);bd.classList.toggle('open',o);document.body.classList.toggle('nav-open',o);
+    btn.setAttribute('aria-expanded',o?'true':'false');
+    if(o&&links[0])setTimeout(function(){links[0].focus()},120);
+    if(!o&&focusBtn)btn.focus();
+  }
+  btn.addEventListener('click',function(){setOpen(!sb.classList.contains('open'),true)});
+  bd.addEventListener('click',function(){setOpen(false,true)});
+  links.forEach(function(l){l.addEventListener('click',function(){setOpen(false,false)})});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&sb.classList.contains('open'))setOpen(false,true)});
+  window.addEventListener('resize',function(){if(innerWidth>=900&&sb.classList.contains('open'))setOpen(false,false)},{passive:true});
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+  const PREFIX = 'ivFifoInterview_';
+
+  const DATA = [
+    // ---------- SystemVerilog ----------
+    { id:'sv1', cat:'SystemVerilog', lvl:1,
+      q:'¿Diferencia entre <code>logic</code> y <code>wire</code>/<code>reg</code>?',
+      a:'<code>logic</code> es un tipo de dato de 4 estados (0, 1, x, z) introducido por SystemVerilog; admite asignación continua y procedural, por lo que sustituye a <code>reg</code> en bloques <code>always</code>. <code>wire</code> solo soporta asignación continua o conexión; <code>reg</code> solo procedural en Verilog clásico. En síntesis, <code>logic</code> no implica registro: el hardware resultante depende de la sintaxis. Para múltiples drivers se sigue usando <code>wire</code> o <code>tri</code>.',
+      trap:'Pensar que <code>reg</code> o <code>logic</code> siempre genera un flip-flop; es un error común confundir tipo de asignación con elemento almacenante.' },
+
+    { id:'sv2', cat:'SystemVerilog', lvl:1,
+      q:'Explica blocking vs non-blocking assignment y el race condition clásico.',
+      a:'Con blocking (<code>=</code>), cada asignación se actualiza inmediatamente en el mismo time step y el orden importa. Con non-blocking (<code>&lt;=</code>), los LHS se actualizan al final de la región NBA (delta), evaluando todos los RHS con los valores anteriores. En un <code>always_ff @(posedge clk)</code> se usa non-blocking para modelar registros y evitar carreras entre módulos; blocking en lógica combinacional puede producir sensitivity incompleta. El race clásico aparece cuando el testbench usa blocking y muestrea en el mismo flanco sin clocking block.',
+      trap:'Usar blocking para registros porque “así se ve el cambio inmediato”; en simulación produce resultados según orden de hilos y en síntesis puede generar latches o registros incorrectos.' },
+
+    { id:'sv3', cat:'SystemVerilog', lvl:2,
+      q:'Describe las regiones de eventos de SystemVerilog (Active, Observed, Reactive) y para qué sirven los clocking blocks.',
+      a:'El program scheduler divide cada time step: <b>Active</b> ejecuta RTL continuo/blocking y evalúa NBC; <b>Observed</b> evalúa muestras de properties SVA; <b>Reactive</b> ejecuta respuestas del testbench (program blocks). Los <b>clocking blocks</b> definen skews de input/output respecto a un flanco; las variables se muestrean en Preponed y se drive en Re-NBA, evitando carreras TB/DUT. Con <code>default input #1step</code> o <code>output #0</code> se controla muestreo y conducción, dando señales estables al DUT.',
+      trap:'Creer que el testbench y el RTL se ejecutan en la misma región y que añadir #0 es solo un retardo cosmético; #0 puede introducir carreras en vez de resolverlas.' },
+
+    { id:'sv4', cat:'SystemVerilog', lvl:2,
+      q:'¿Qué hace <code>new</code> con objetos de clase en SystemVerilog y por qué no es deep copy?',
+      a:'<code>new</code> crea un objeto y devuelve un handle; si haces <code>h2 = h1</code> o copias el handle, ambos apuntan al mismo objeto. Los cambios internos afectan a ambos; eso es shallow copy. Para deep copy hay que crear una copia explícita (un método <code>copy</code> o <code>clone</code>) que duplique el objeto y todos sus campos, incluyendo arrays y objetos anidados. En UVM, <code>uvm_object_utils</code> y fields automation permiten <code>copy</code>/<code>compare</code> si se implementan correctamente.',
+      trap:'Decir que <code>new</code> copia el contenido automáticamente; se confunde handle con objeto y se producen aliasing y comparaciones incorrectas.' },
+
+    { id:'sv5', cat:'SystemVerilog', lvl:2,
+      q:'¿Qué es una virtual interface y por qué se usa en UVM?',
+      a:'Una virtual interface es un handle que apunta a una instancia de interface estática (señales reales del DUT). Las clases de UVM no pueden conectarse directamente a señales de módulo; la virtual interface permite que driver y monitor accedan a las señales de forma portable. Se configura vía <code>uvm_config_db</code> y se asigna a una variable <code>virtual fifo_if vif</code>. Desacopla el testbench del path jerárquico y reutiliza el agent en muchos entornos.',
+      trap:'Confundir “virtual” con herencia; no es un objeto con almacenamiento, es un puntero a una interface existente. Si no se asigna correctamente, falla con null handle.' },
+
+    { id:'sv6', cat:'SystemVerilog', lvl:3,
+      q:'¿Qué es X-optimism en simulación RTL y cómo se mitiga?',
+      a:'En SystemVerilog, las condiciones <code>if (x)</code> o <code>case (x)</code> tratan X/Z como falso cuando no hay cláusula explícita, por lo que una X real puede pasar desapercibida como si fuera 0 o 1; eso es X-optimism. Para detectarlo: revisar resets, propagar X explícitamente, usar <code>casex</code> con cuidado, inicializar memorias/registros y comparar con gate-level. En este RTL, <code>mem</code> no se inicializa; leer una ubicación no escrita produce X y puede no detectarse si el scoreboard solo consulta <code>empty</code>.',
+      trap:'Decir que la simulación RTL no tiene errores porque “no vio X”; si el reset falla o hay condicionales con X, el RTL simula limpio pero el silicio puede fallar.' },
+
+    // ---------- Constraints ----------
+    { id:'c1', cat:'Constraints', lvl:2,
+      q:'Constraint: genera un <code>value</code> de 32 bits con exactamente 10 bits cero contiguos y el resto a 1. Valida posiciones de inicio 0 a 22.',
+      a:'Solución compacta: declara <code>start</code> aleatorio en <code>[0:22]</code> y deriva <code>value</code> como complemento de un mask de 10 unos desplazado. <code>32\'h3FF</code> es 10 unos; al desplazarlo y negarlo se genera el bloque de 10 ceros contiguos con posición <code>start</code>. La restricción de rango evita que el bloque salga del bit 31. Alternativas: rotar <code>32\'hFFFF_FC00</code> o usar lookup table de 23 entradas.',
+      trap:'Proponer <code>foreach (value[i]) if (i&lt;10) value[i]==0;</code> no garantiza contigüidad y permite múltiples ceros separados.',
+      code: `class contiguous_zeros;
+  rand bit [4:0] start;
+  rand bit [31:0] value;
+  constraint c_start { start inside {[0:22]}; }
+  constraint c_value { value == ~(32'h3FF << start); }
+endclass` },
+
+    { id:'c2', cat:'Constraints', lvl:3,
+      q:'Constraint: cada randomización debe cambiar exactamente 2 bits con respecto al valor previo. Explica la solución y el papel de <code>const\'()</code>.',
+      a:'<code>const\'()</code> captura el valor previo a la randomización de la variable. La expresión <code>const\'(cur) ^ cur</code> compara el valor viejo con el nuevo, y <code>$countones(...) == 2</code> fuerza exactamente dos bits distintos. Alternativa robusta: guardar una variable <code>static prev</code> y restringir <code>prev ^ cur</code>, actualizando <code>prev</code> en <code>post_randomize</code>. Verifica el soporte de tu tool para <code>const\'()</code> en constraints; si no, usa <code>prev</code> no rand.',
+      trap:'Usar <code>prev == cur ^ 2</code> suponiendo que XOR con 2 cambia dos bits; 2 en binario solo tiene un bit encendido, por lo que no cumple exactamente 2 bits distintos.',
+      code: `class two_bit_delta;
+  rand bit [31:0] cur;
+  constraint c_delta { $countones(const'(cur) ^ cur) == 2; }
+endclass` },
+
+    { id:'c3', cat:'Constraints', lvl:2,
+      q:'¿Diferencia entre soft y hard constraints en SystemVerilog?',
+      a:'Una <b>soft constraint</b> (<code>soft</code>) expresa un valor por defecto o preferencia que puede ser sobreescrita por restricciones hard posteriores o por aleatorización; no es obligatoria si entra en conflicto con una hard. Una <b>hard constraint</b> (sin <code>soft</code>) no puede violarse. Prioridad: las hard del mismo scope y de scope posterior ganan; las soft solo se aplican si la solución sigue siendo factible. Son útiles para dar defaults en clases base y permitir overrides en derivadas sin invalidar todo.',
+      trap:'Creer que soft es solo un comentario y que cualquier hard la neutraliza; una soft se cumple si no choca, y con conflicto entre soft y hard gana la hard.' },
+
+    { id:'c4', cat:'Constraints', lvl:2,
+      q:'¿Qué hace <code>solve before</code> y cuándo es necesario?',
+      a:'<code>solve before</code> establece un orden determinista de resolución para evitar sesgos en distribución. Por ejemplo, si <code>size</code> limita a <code>data</code>, resolver <code>size</code> primero permite elegir <code>size</code> uniformemente y luego <code>data</code> uniformemente dentro del rango válido; sin <code>solve before</code>, el solver puede elegir <code>data</code> antes y sesgar <code>size</code>. Se usa cuando se sospecha que la distribución no es uniforme o para simplificar debugging.',
+      trap:'Pensar que <code>solve before</code> cambia la semántica de las restricciones; solo afecta el orden de resolución, no qué combinaciones son legales.' },
+
+    { id:'c5', cat:'Constraints', lvl:2,
+      q:'¿Cuándo usarías <code>pre_randomize()</code> y <code>post_randomize()</code>? Da un ejemplo típico.',
+      a:'<code>pre_randomize()</code> se ejecuta antes de resolver y puede preparar variables no aleatorias o condicionar la solución (p. ej., calcular límites en función de un state o limpiar arrays dinámicos). <code>post_randomize()</code> se ejecuta después y sirve para actualizar variables derivadas, imprimir o actualizar un modelo de referencia, como guardar el valor previo para la siguiente iteración. Ejemplo: en una restricción de dos bits, en <code>post_randomize</code> guardas el valor actual para compararlo en la próxima randomización.',
+      trap:'Usar <code>pre_randomize</code> para corregir restricciones conflictivas o asumir que el solver respeta siempre variables no rand actualizadas en post_randomize.' },
+
+    { id:'c6', cat:'Constraints', lvl:3,
+      q:'¿Cómo aleatorizas el tamaño de un array dinámico y sus elementos? Da nota sobre límites.',
+      a:'Declaras <code>rand bit [7:0] arr[];</code> y restringes <code>arr.size() inside {[1:256]};</code> más <code>foreach (arr[i]) arr[i] &lt; 100;</code>. Al ser <code>rand</code>, el solver decide tamaño y elementos: no hace falta prealocar con <code>new[]</code>. Si el array <em>no</em> es <code>rand</code>, tú debes dimensionarlo (p. ej. en <code>pre_randomize</code>). Alternativa: <code>rand int unsigned len; rand byte data[];</code> con <code>data.size() == len</code>. El orden de resolución entre <code>len</code> y <code>data</code> puede requerir <code>solve len before data</code>.',
+      trap:'Olvidar que el tamaño aleatorio puede ser 0 (protege con <code>size() &gt; 0</code> si tu código indexa) o declarar el array sin <code>rand</code> y esperar que el solver lo dimensione.' },
+
+    // ---------- UVM ----------
+    { id:'uvm1', cat:'UVM', lvl:1,
+      q:'Describe build_phase y connect_phase en UVM: orden top-down/bottom-up y qué conectas.',
+      a:'<code>build_phase</code> se ejecuta top-down: el <code>test</code> construye el env, el env construye agentes, scoreboard, etc. Se crean componentes con <code>type_id::create</code> y se configura vía <code>config_db::get</code>. <code>connect_phase</code> se ejecuta bottom-up: los componentes hijos conectan sus analysis ports/exports a los padres o entre sí. Esta separación asegura que todo exista antes de conectar, evitando handles nulos. <code>run_phase</code> comienza después de connect_phase y levanta sequences.',
+      trap:'Intentar conectar en build_phase (los hijos aún no existen) o asumir que connect_phase es top-down; produce null handle errors.' },
+
+    { id:'uvm2', cat:'UVM', lvl:2,
+      q:'¿Qué son las objections en UVM y por qué se usan?',
+      a:'Las objections controlan la duración de un test. Antes de levantar una secuencia, el test o la sequence hace <code>phase.raise_objection(this)</code>; al terminar, <code>phase.drop_objection(this)</code>. Mientras haya alguna objection activa, la fase no termina; cuando todas caen, UVM detiene la simulación. Sin objections, <code>run_phase</code> se completa inmediatamente y las sequences no se ejecutan. Se deben levantar al inicio de la secuencia principal y soltar al final, evitando que un hilo olvidado deje objections colgadas y cuelgue la regresión.',
+      trap:'Levantar objection en un hilo que no es el de la secuencia y olvidar soltarla en caminos de error; causa timeouts o simulación que nunca termina.' },
+
+    { id:'uvm3', cat:'UVM', lvl:2,
+      q:'¿Diferencia entre uvm_analysis_port y TLM FIFO? ¿Cuándo prefieres cada uno?',
+      a:'Un <code>uvm_analysis_port</code> es broadcast unidireccional: un monitor envía la misma transacción a todos los suscriptores conectados (scoreboard, coverage) y no bloquea. Un <b>TLM FIFO</b> (<code>uvm_tlm_fifo</code>) encola transacciones entre productor y consumidor, permitiendo push/pop con blocking y almacenamiento. Para distribuir transacciones observadas a múltiples análisis se usan analysis ports; para pasar datos de un driver a una secuencia o entre componentes con control de flujo se usa TLM FIFO.',
+      trap:'Creer que analysis port almacena transacciones o que TLM FIFO es broadcast; confundir el patrón publish/subscribe con un canal punto a punto.' },
+
+    { id:'uvm4', cat:'UVM', lvl:3,
+      q:'¿Cómo sobrescribes un componente con la factory en UVM? Menciona type override e instance override.',
+      a:'La factory permite sustituir una clase por otra derivada sin modificar el testbench. Type override: <code>set_type_override_by_type(original::get_type(), clon::get_type())</code>; instance override: <code>set_inst_override_by_type(original::get_type(), clon::get_type(), "env.agent.drv")</code>. Los componentes se crean con <code>type_id::create</code>, que consulta la factory. Útil para reemplazar un driver real por uno de error o un scoreboard por una referencia alternativa.',
+      trap:'Usar <code>new</code> en lugar de <code>create</code> evita la factory y los overrides no funcionan; o configurar override después de que el componente fue creado.' },
+
+    { id:'uvm5', cat:'UVM', lvl:2,
+      q:'¿Qué es una virtual sequence y por qué usarla?',
+      a:'Una virtual sequence coordina sequences en múltiples sequencers sin estar ligada a un sequencer específico. Tiene handles a sequencers/sequences y en su <code>body</code> hace <code>`uvm_do_on</code> o <code>start</code> sobre ellos. Se lanza desde un <b>virtual sequencer</b> que agrupa handles a sequencers reales. Permite controlar simultáneamente estímulos de varios agents (p. ej., escribir en la FIFO y leer concurrentemente), manteniendo reuso y jerarquía.',
+      trap:'Pensar que virtual sequence se conecta directamente a un sequencer físico por herencia; sin virtual sequencer o config adecuada los handles nulos fallan.' },
+
+    // ---------- SVA ----------
+    { id:'sva1', cat:'SVA', lvl:1,
+      q:'Diferencia entre immediate y concurrent assertions en SVA.',
+      a:'Las <b>immediate assertions</b> se colocan en código procedural (<code>assert (a == b)</code>) y se evalúan una vez en ese instante, en la región de ejecución; no usan reloj y son sensibles a glitches. Las <b>concurrent assertions</b> se definen con <code>assert property (@(posedge clk) ...)</code> y se evalúan sobre ciclos de reloj, muestreando señales en regiones Preponed/Observed. Para verificar protocolos y señales temporales se usan concurrentes; las immediate sirven para chequeos locales en funciones/tasks o inicialización.',
+      trap:'Usar immediate assertion en un <code>always</code> con reloj creyendo que verifica el protocolo temporal; solo comprueba valores en un instante y no captura secuencias.' },
+
+    { id:'sva2', cat:'SVA', lvl:2,
+      q:'¿Qué es un vacuous pass y por qué debe preocuparte en verificación?',
+      a:'Un vacuous pass ocurre cuando una propiedad de implicación <code>A |-> B</code> tiene antecedente <code>A</code> siempre falso: la propiedad se cumple trivialmente sin comprobar nada. Por ejemplo, <code>wr_en &amp;&amp; full |-> ...</code> nunca dispara en un test que nunca llena la FIFO. Para detectarlo se usa <code>cover property (A);</code> que mide si el antecedente se ejercitó. Si no hay cobertura, la aserción no valida el corner case. Hay que añadir estímulos dirigidos o cobertura de activación.',
+      trap:'Ver un assertion PASS en el reporte y asumir que el corner case fue verificado; el pass vacuo no equivale a cobertura de la condición.' },
+
+    { id:'sva3', cat:'SVA', lvl:3,
+      q:'Explica safety vs bounded-response properties (liveness acotada) y da un ejemplo FIFO.',
+      a:'Una <b>safety</b> property prohíbe algo malo en toda ejecución finita: “si estás full, no se acepta write” o “full nunca se contradice con la igualdad de punteros”. Su violación se detecta con un contraejemplo finito. Una <b>bounded-response</b> es un tipo de liveness acotada: “si haces write, en a lo más N ciclos empty baja” o “ack llega en 1-3 ciclos”. Requiere especificar límite temporal y es más difícil de verificar exhaustivamente; en SVA se expresa con <code>##[1:N]</code> tras el antecedente.',
+      trap:'Llamar “safety” a cualquier assertion de falla; una respuesta temporal es liveness y necesita una cota explícita para ser decidible en simulación.' },
+
+    { id:'sva4', cat:'SVA', lvl:2,
+      q:'Diferencia entre <code>|-></code> y <code>|=&gt;</code>, y qué hace <code>##1</code>.',
+      a:'<code>|-></code> (overlapping implication) evalúa el consecuente en el mismo ciclo en el que el antecedente es verdadero. <code>|=&gt;</code> es equivalente a <code>|-> ##1</code>, es decir, el consecuente se verifica un ciclo después. Se usa <code>|=&gt;</code> para propiedades de registros o protocolos donde la respuesta tarda un ciclo; <code>|-></code> para combinacionalidad o expectativas inmediatas. En este RTL, <code>rd_en &amp;&amp; !empty |-> rd_data == mem[rd_ptr[AW-1:0]]</code> es correcto porque <code>rd_data</code> es combinacional.',
+      trap:'Confundir <code>|=&gt;</code> con “al mismo tiempo que el flanco siguiente”; el sampling del consecuente ocurre en el ciclo posterior, no en el mismo evento.' },
+
+    { id:'sva5', cat:'SVA', lvl:3,
+      q:'¿Cuándo prefieres una assertion SVA frente a un scoreboard UVM?',
+      a:'Las assertions verifican relaciones temporales de señales (full/empty, punteros, protocolo) en cada ciclo y son ideales para propiedades locales. Los scoreboards comparan secuencias de transacciones de mayor nivel (datos escritos/leídos, orden, integridad) contra un modelo de referencia. Se complementan: la assertion detecta protocolo roto en el flanco exacto; el scoreboard detecta corrupción de datos de múltiples transacciones. En esta FIFO, <code>a_no_wr_full</code> es más directa con SVA; la secuencia de 100 writes/reads con verificación de datos usa scoreboard.',
+      trap:'Intentar verificar orden y datos con una sola property; las SVA pueden volverse ilegibles y no modelan colas fácilmente; el scoreboard es mejor para datos.' },
+
+    // ---------- Cobertura ----------
+    { id:'cov1', cat:'Cobertura', lvl:1,
+      q:'Diferencia entre code coverage y functional coverage en verificación.',
+      a:'<b>Code coverage</b> mide cuántas líneas, branches, conditions, FSMs o toggles se ejecutaron; es estructural y no sabe qué comportamiento es importante. <b>Functional coverage</b> mide eventos, valores o cruces definidos por el plan de verificación (covergroups): ¿se cubrieron full/empty, write durante full, etc.? Una cobertura de código alta no garantiza cobertura funcional: puedes ejecutar una línea sin ejercitar un corner case. Ambas se complementan y se cierran con cobertura justificada.',
+      trap:'Reportar 100% de code coverage y declarar verificación completa; los huecos funcionales pueden permanecer abiertos aunque las líneas se hayan ejecutado.' },
+
+    { id:'cov2', cat:'Cobertura', lvl:2,
+      q:'¿Por qué alcanzar 100% de cobertura no demuestra que los checkers son correctos?',
+      a:'La cobertura mide qué estímulos se ejercitaron, no si el scoreboard/modelo de referencia detecta errores. Un scoreboard mal implementado que espera datos erróneos o no compara correctamente puede dar PASS con 100% de cobertura. También las assertions pueden tener antecedentes incorrectos o ser vacuous. Hay que revisar la lógica del checker, inyectar fallas deliberadas (error injection) y validar el modelo de referencia. La cobertura es condición necesaria, no suficiente.',
+      trap:'Asumir que “coverage closed” implica que el DUT es correcto; el verificador puede estar verificado positivamente contra un modelo erróneo.' },
+
+    { id:'cov3', cat:'Cobertura', lvl:3,
+      q:'Explica ignore_bins, illegal_bins y transition bins en covergroups; da un ejemplo en esta FIFO.',
+      a:'<code>ignore_bins</code> descarta valores irrelevantes para no contaminar el porcentaje; <code>illegal_bins</code> marcan bin como ilegal y generan error si ocurren; <code>transitions</code> cubren secuencias de valores entre muestras. En esta FIFO, un <code>illegal_bins</code> típico: <code>full &amp;&amp; empty</code> no deben ser simultáneos. Un transition bin <code>(empty =&gt; full)</code> puede ser raro y necesitar test dirigido; con cobertura lo cazas. Con DEPTH potencia de dos, no hay valores de ocupación imposibles, pero si cambias de esquema habría que ignorar bins no alcanzables.',
+      trap:'Definir <code>illegal_bins</code> sin que la herramienta los reporte o confundir ignore e illegal: ignore elimina, illegal falla la simulación.' },
+
+    // ---------- CDC/FIFO ----------
+    { id:'cdc1', cat:'CDC/FIFO', lvl:2,
+      q:'En una FIFO asíncrona, ¿por qué se convierten los punteros a código Gray antes de cruzar dominios de reloj?',
+      a:'Un puntero binario puede cambiar varios bits al pasar de un valor a otro (por ejemplo, 7→8 cambia 4 bits). Si el dominio receptor muestrea el puntero justo durante la transición, puede leer un valor intermedio incorrecto. El código Gray asegura que entre valores consecutivos solo cambia un bit, por lo que un muestreo a media transición tendrá o el valor viejo o el nuevo, nunca un valor absurdo. La conversión es <code>gray = bin ^ (bin&gt;&gt;1)</code>. Luego se sincroniza cada bit con 2 flops.',
+      trap:'Creer que Gray evita la necesidad de sincronizadores; solo reduce el riesgo de muestreo erróneo, pero sigue habiendo metaestabilidad, por eso se usan 2 flops.' },
+
+    { id:'cdc2', cat:'CDC/FIFO', lvl:2,
+      q:'¿Por qué se usan 2 flip-flops de sincronización y cuál es su limitación?',
+      a:'Un único flop puede muestrear una señal mientras está en metaestabilidad y propagar un valor indeterminado. Dos flops en cascada en el dominio receptor dan tiempo a que la salida del primer flop se estabilice antes del segundo, reduciendo la probabilidad de metaestabilidad (MTBF) a niveles aceptables. La limitación: añade latencia de 2 ciclos y no elimina absolutamente la metaestabilidad; solo la hace suficientemente improbable. Señales multi-bit no deben sincronizarse bit a bit de forma independiente; se usa Gray o handshake.',
+      trap:'Pensar que dos flops garantizan 100% de corrección; la metaestabilidad es probabilística y depende del MTBF y la frecuencia.' },
+
+    { id:'cdc3', cat:'CDC/FIFO', lvl:3,
+      q:'¿Cómo se derivan full y empty en FIFO asíncrona y por qué son conservadoras?',
+      a:'En una FIFO asíncrona, el lado de escritura compara su <code>wr_ptr</code> con el <code>rd_ptr</code> sincronizado al dominio de escritura, y viceversa. Debido a la latencia de sincronización, los flags pueden estar desactualizados. <b>Full</b> se calcula de forma pessimista: si el <code>rd_ptr</code> sincronizado aún no ha visto las últimas lecturas, la FIFO parece más llena de lo real, por lo que <code>full</code> puede asertarse prematuramente (safe, no sobrescribe). <b>Empty</b> similar: se ve más vacía, por lo que se puede retardar la lectura (safe, no lee inválido).',
+      trap:'Exigir flags exactos en FIFO asíncrona; la pérdida temporal de rendimiento es el precio por seguridad, y el burst size debe considerar ese margen.' },
+
+    { id:'cdc4', cat:'CDC/FIFO', lvl:3,
+      q:'¿Cuál es el bug clásico al comparar punteros binarios raw entre dominios en una FIFO asíncrona?',
+      a:'El bug típico es sincronizar cada bit del puntero binario de forma independiente. Como varios bits pueden cambiar simultáneamente, los bits sincronizados pueden quedar desalineados y producir un puntero combinado que nunca existió realmente, llevando a flags full/empty corruptos. Por ejemplo, el puntero binario 011→100 cambia 3 bits; cada bit sincronizado puede muestrear viejo o nuevo, resultando 111 o 000. Eso provoca overflow/underflow reales. Solución: convertir a Gray antes de cruzar, sincronizar, y luego convertir de vuelta a binario si se necesita.',
+      trap:'Decir que se pueden comparar directamente los punteros binarios con un 2-flop por bit “porque son pocos bits”; el desalineamiento por transiciones multi-bit rompe la correlación.' },
+
+    { id:'cdc5', cat:'CDC/FIFO', lvl:3,
+      q:'Cálculo: escritor 100 MHz, lector 80 MHz, ráfaga de 160 palabras sin idle. ¿Qué profundidad mínima necesitas y por qué se añaden 2-3 palabras?',
+      a:'Fórmula general para ráfaga continua: <code>depth = burst_len - (read_rate/write_rate)*burst_len</code> cuando el lector lee concurrentemente. Sustituyendo: <code>160 - 160*(80/100) = 160 - 128 = 32</code>. Se añaden 2-3 palabras de margen por la latencia de los sincronizadores y por pesimismo en flags asíncronos. Resultado práctico: 35 palabras, redondeando al siguiente diseño razonable (potencia de dos: 64 si el burst es preciso). En presencia de idle en escritura/lectura, la profundidad necesaria se calcula con el peor backlog acumulado.',
+      trap:'Usar solo <code>write_rate - read_rate</code> (20 MHz) y olvidar multiplicar por la duración de la ráfaga; o dar 32 sin margen y causar overflow real.' },
+
+    { id:'cdc6', cat:'CDC/FIFO', lvl:3,
+      q:'¿Por qué necesitas reset separado por dominio en una FIFO asíncrona? ¿Qué pasa si compartes reset?',
+      a:'Cada dominio de reloj debe tener su propia secuencia de reset asíncrono/síncrono y sincronizada a su reloj. El reset del dominio de escritura se sincroniza y aserta <code>wr_ptr</code>; el del de lectura, <code>rd_ptr</code>. Si se aplica un único reset asíncrono común, puede llegar de forma metaestable a uno de los dominios o coincidir con un flanco, dejando los punteros en estados inconsistentes. Además, la remoción del reset debe ser síncrona en cada dominio para evitar recovery/removal violations. En este repo sync_fifo es síncrono y solo usa un reset; para async debes separarlo.',
+      trap:'Pensar que “un reset global asíncrono es más seguro”; sin sincronizadores de reset por dominio se violan timing recovery/removal y se arriesga arranque inconsistente.' },
+
+    { id:'cdc7', cat:'CDC/FIFO', lvl:2,
+      q:'Compara first-word-fall-through (FWFT) y lectura registrada; ¿cuál usa este RTL?',
+      a:'En <b>FWFT</b>, <code>rd_data</code> muestra el dato en la cabeza de la FIFO combinacionalmente mientras <code>!empty</code>; cuando afirmas <code>rd_en</code>, el siguiente dato aparece sin esperar un flanco adicional. En <b>registered read</b> el dato se registra y <code>rd_en</code> captura en un ciclo, apareciendo <code>rd_data</code> en el siguiente flanco. Este RTL es FWFT: <code>assign rd_data = mem[rd_ptr[AW-1:0]]</code>. Esto simplifica protocolo, pero en diseños de alta frecuencia el path combinacional desde memoria a salida puede ser crítico.',
+      trap:'Asumir que <code>rd_en</code> produce <code>rd_data</code> en el mismo ciclo en todas las FIFO; con registered read necesitas un ciclo de latencia.' },
+
+    { id:'cdc8', cat:'CDC/FIFO', lvl:3,
+      q:'En este RTL (<code>sync_fifo.sv</code>), ¿qué ocurre si <code>wr_en=1</code>, <code>rd_en=1</code> y la FIFO está llena? ¿Cómo lo modela el scoreboard?',
+      a:'El RTL evalúa <code>do_wr = wr_en &amp;&amp; !full</code> y <code>do_rd = rd_en &amp;&amp; !empty</code>. Si está <b>full</b>, <code>do_wr</code> es 0, así que la escritura se descarta aunque en el mismo ciclo haya lectura. <code>do_rd</code> es 1, por lo que la lectura avanza el <code>rd_ptr</code>. El scoreboard debe modelar exactamente esta política: si hay write válido y la cola está llena, ignora el write; si hay read válido, extrae. Si el scoreboard asume que el write se acepta porque hay read en el mismo ciclo (capacidad disponible), fallará la verificación.',
+      trap:'Suponer que simultaneous read/write libera el slot a tiempo para aceptar el write; en este diseño no es así, y muchas entrevistas buscan que clarifiques spec antes de asumir.' },
+
+    { id:'cdc9', cat:'CDC/FIFO', lvl:3,
+      q:'¿Funciona este esquema de bit extra si DEPTH=1? Explica.',
+      a:'No. Con <code>DEPTH=1</code>, <code>AW=$clog2(1)=0</code>: el índice de memoria desaparece, el part-select <code>[AW-1:0]</code> queda <code>[-1:0]</code> (ilegal) y la fórmula de <code>full</code> (<code>wr_ptr[AW]!=rd_ptr[AW] &amp;&amp; wr_ptr[AW-1:0]==rd_ptr[AW-1:0]</code>) deja de aplicarse. Hay que exigir <code>DEPTH &gt;= 2</code> (assert de elaboración) o usar un contador de ocupación. El header del RTL solo dice “potencia de dos” y 1 = 2<sup>0</sup>, así que no lo excluye.',
+      trap:'Asumir que el truco del bit extra funciona para toda potencia de dos; con DEPTH=1 rompe porque <code>$clog2(1)=0</code> y no queda bits de índice.' },
+
+    { id:'cdc10', cat:'CDC/FIFO', lvl:2,
+      q:'¿Cómo maneja el RTL el wrap-around de punteros y por qué no se puede usar un contador simple de slots?',
+      a:'El RTL usa punteros de <code>AW+1</code> bits que se incrementan continuamente y se aprovechan en mod <code>2*DEPTH</code>. El bit extra distingue si los punteros han dado distinta cantidad de vueltas. Al indexar la memoria se usa <code>wr_ptr[AW-1:0]</code>, por lo que el wrap-around es natural. Un contador de slots de <code>AW</code> bits no distingue vacía/llena sin saber cuántas vueltas se han dado; se necesitaría una bandera extra o comparación de distancias. El código presentado es una solución estándar para FIFO síncrona con DEPTH potencia de dos.',
+      trap:'Decir que se resetean los punteros al llegar a DEPTH o que se usa un counter de ocupación; este RTL no lleva contador, y reset en cada vuelta perdería la distinción full/empty.' },
+
+    { id:'cdc11', cat:'CDC/FIFO', lvl:2,
+      q:'¿Qué sucede en este RTL si se afirma <code>rst_n</code> en mitad de una operación? ¿Cómo verificar que no hay corrupción?',
+      a:'El reset es asíncrono activo bajo (<code>negedge rst_n</code>). Si cae en mitad de un write/read, el <code>always_ff</code> asigna <code>wr_ptr &lt;= \'0; rd_ptr &lt;= \'0;</code> en el mismo time step, perdiendo estado. Tras la deassertión, la FIFO queda vacía; datos escritos previamente se pierden por diseño. El testbench debe verificar que después de reset, <code>empty==1</code>, <code>full==0</code>, y <code>rd_data</code> sea la ubicación 0 (posiblemente X). No se debe asumir que los datos sobreviven al reset.',
+      trap:'Modelar que la FIFO conserva datos al reset; el RTL no lo hace, y un scoreboard con retención de datos fallaría el escenario de reset en tráfico.' },
+
+    // ---------- Debug ----------
+    { id:'dbg1', cat:'Debug', lvl:2,
+      q:'¿Qué es X-optimism en simulación RTL y cómo afecta a esta FIFO?',
+      a:'X-optimism ocurre cuando una condición con X/Z se evalúa como falsa y la simulación sigue como si hubiera un valor definido. En este RTL, <code>mem</code> no se inicializa; si se lee una posición nunca escrita, <code>rd_data</code> será X. Si el testbench solo comprueba <code>empty</code> para validar lecturas, puede no detectar datos X porque el scoreboard a menudo compara señales de 4 estados. Además, <code>if (do_wr)</code> con clocks/reset malos puede ocultar X. Para mitigar: revisar resets, modelar propagación X, y en gate-level las X serán evidentes.',
+      trap:'Ver que la simulación pasa con <code>rd_data</code> X y no alarmarse; las X en RTL a menudo no se propagan por if/case falsos, escondiendo bugs de reset.' },
+
+    { id:'dbg2', cat:'Debug', lvl:3,
+      q:'Tienes una regresión que falla solo en una semilla. ¿Cuál es tu flujo de debug?',
+      a:'Primero reproducir con la misma semilla exacta y mismas opciones (<code>+UVM_TESTNAME</code>, seed, run dir). Si no reproduce, sospechar dependencia de aleatoriedad o inicialización. Si reproduce, buscar el primer punto de divergencia con mensajes/asserts y waveform; comparar contra un run bueno. Revisar si la falla es del RTL o del modelo/scoreboard/constraints: muchas fallas son del testbench (restricciones incorrectas, monitor muestreando mal, modelo desincronizado). Corregir el checker o la constraint y volver a correr con esa semilla; luego lanzar regresiones de barrido.',
+      trap:'Asumir que cualquier falla con seed rara es bug del RTL; estadísticamente, la mayoría de fallos al integrar TB son del propio TB, no del diseño.' },
+
+    { id:'dbg3', cat:'Debug', lvl:2,
+      q:'¿Por qué se hace gate-level simulation y qué cambia respecto a RTL simulation?',
+      a:'La simulación RTL modela la funcionalidad con X-optimism y tiempos ideales; la gate-level simula el netlist post-síntesis con retardos, incluyendo glitches, metaestabilidad aproximada y propagación de X más fiel. Detecta problemas de timing, reset recovery/removal, gated clocks y condiciones que RTL simula como limpias. Es más lenta y requiere SDF y modelos de celdas. En verificación sign-off se incluye al menos una suite reducida en gate-level para confirmar que la síntesis no introdujo comportamientos no previstos.',
+      trap:'Confiar solo en RTL sim y luego encontrar que el netlist falla por timing o reset no modelado; gate-level ayuda a cerrar el gap entre sim funcional y silicio.' },
+
+    // ---------- Diseño de TB ----------
+    { id:'tb1', cat:'Diseño de TB', lvl:2,
+      q:'¿Cómo modelas en UVM scoreboard este <code>sync_fifo.sv</code> en el corner case <code>wr_en &amp;&amp; full &amp;&amp; rd_en</code>?',
+      a:'Mantén una cola de referencia con las palabras escritas válidas. Cada ciclo, captura las señales con el monitor en el clocking block: <code>do_wr = wr_en &amp;&amp; !full</code>, <code>do_rd = rd_en &amp;&amp; !empty</code>. Si <code>do_rd</code>, haz <code>pop_front</code> de la cola y compara con <code>rd_data</code>. Si <code>do_wr</code>, haz <code>push_back(wr_data)</code>. Con <code>full=1</code> y <code>rd_en=1</code>, <code>do_wr=0</code> y el write se ignora, por lo que solo haces pop. Debes replicar exactamente las condiciones del RTL, no razonar con “capacidad disponible”.',
+      trap:'Modelar el scoreboard con reglas genéricas tipo “si hay read y write a la vez, primero lee y luego escribe” puede romper la correspondencia con el RTL; aquí full bloquea el write siempre.' },
+
+    { id:'tb2', cat:'Diseño de TB', lvl:2,
+      q:'¿Cómo evitas races entre driver y monitor en UVM usando clocking blocks?',
+      a:'El driver y monitor acceden a la virtual interface a través de clocking blocks. Con <code>default input #1step</code> se muestrean las entradas justo antes del flanco (Preponed); con <code>output #0</code> se drive justo después del flanco. Así el driver ve valores estables y produce salidas que el monitor observa en el flanco correcto, sin ambigüedad de región. Para el DUT, las salidas se aplican en el mismo ciclo con skew. En este testbench FIFO, <code>wr_en</code>, <code>rd_en</code>, <code>wr_data</code> se drive desde el driver y se muestrean en el monitor con el mismo clocking.',
+      trap:'Usar asignaciones directas a <code>vif.wr_en</code> sin skew; el TB puede intercalarse en regiones Active/Reactive y ver resultados dependiendo del tool.' },
+
+    { id:'tb3', cat:'Diseño de TB', lvl:2,
+      q:'¿Cuándo dirigir pruebas y cuándo constrained-random en esta FIFO?',
+      a:'Constrained-random es ideal para explorar combinaciones de <code>wr_en</code>, <code>rd_en</code>, ocupación y datos en miles de ciclos, y para cazar corner cases difíciles sin enumerar manualmente. Directed tests son necesarios para escenarios deterministas raros: full→write, empty→read, racha exacta que llena, reset en mitad de tráfico, o para reproducir un bug con secuencia específica. Se complementan: random para cobertura amplia, directed para cerrar bins concretos (full, empty, simultaneous) que el random puede no alcanzar con suficiente frecuencia.',
+      trap:'Hacer solo random y esperar que cubra full/empty; el random puede tardar muchísimo en llegar al bin extremo, y directed tests garantizan esos casos.' },
+
+    { id:'tb4', cat:'Diseño de TB', lvl:3,
+      q:'¿Qué impacto tiene cambiar DEPTH en el testbench y qué debes parametrizar?',
+      a:'Al cambiar <code>DEPTH</code>, el testbench debe actualizar las definiciones de interface (ocupación y límites de full/empty), los bins de cobertura (<code>cp_occ</code> con bins empty/low/mid/high/full en función de DEPTH) y las secuencias que llenan/drenan la FIFO. El scoreboard debe conocer DEPTH para calcular flags y capacidad. Se recomienda parametrizar la interface y el env con <code>DEPTH</code> y usar macros o <code>uvm_config_db</code> para propagarla. Si la DEPTH es 1 o no potencia de dos, hay que revisar el diseño y quizá cambiar esquema de punteros.',
+      trap:'Cambiar solo el RTL y olvidar los covergroups con valores hardcoded; los bins quedan incorrectos y la cobertura falsea resultados.' }
+  ];
+
+  function load(key, fallback){ try{ const s = localStorage.getItem(PREFIX+key); return s ? JSON.parse(s) : fallback; }catch(e){ return fallback; } }
+  function save(key, val){ try{ localStorage.setItem(PREFIX+key, JSON.stringify(val)); }catch(e){} }
+
+  const section = document.getElementById('nivel-7');
+  if(!section) return;
+
+  const chips = Array.from(section.querySelectorAll('[data-iv-cat]'));
+  const levelSelect = section.querySelector('#ivLevelSelect');
+  const searchInput = section.querySelector('#ivSearch');
+  const list = section.querySelector('#ivFlashList');
+  const progressText = section.querySelector('#ivProgressText');
+  const progressFill = section.querySelector('#ivProgressFill');
+
+  const state = {
+    cat:'Todos',
+    lvl:'todos',
+    search:'',
+    mastered: load('mastered', {}),
+    review: load('review', {}),
+    check: load('check', {})
+  };
+
+  function applyFilters(){
+    const search = state.search.trim().toLowerCase();
+    return DATA.filter(q=>{
+      const ss = (q.q + ' ' + q.a).toLowerCase();
+      return (state.cat==='Todos' || q.cat===state.cat) &&
+             (state.lvl==='todos' || String(q.lvl)===state.lvl) &&
+             (!search || ss.includes(search));
+    });
+  }
+
+  function updateProgress(){
+    const mastered = DATA.filter(q=>!!state.mastered[q.id]).length;
+    const total = DATA.length;
+    progressText.textContent = mastered + '/' + total + ' dominadas';
+    progressFill.style.width = total ? (mastered/total*100) + '%' : '0%';
+  }
+
+  function render(){
+    const arr = applyFilters();
+    list.innerHTML = '';
+    if(!arr.length){
+      const p = document.createElement('p');
+      p.className = 'iv-empty';
+      p.textContent = 'Sin preguntas para este filtro.';
+      list.appendChild(p);
+      updateProgress();
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    arr.forEach(q=>{
+      const art = document.createElement('article');
+      art.className = 'iv-flash';
+      art.dataset.id = q.id;
+
+      const head = document.createElement('div');
+      head.className = 'iv-flash-head';
+      const cat = document.createElement('span');
+      cat.className = 'iv-cat';
+      cat.textContent = q.cat;
+      const lvl = document.createElement('span');
+      lvl.className = 'iv-lvl';
+      lvl.textContent = 'Nivel ' + q.lvl;
+      head.append(cat, lvl);
+
+      const qp = document.createElement('p');
+      qp.className = 'iv-q';
+      qp.innerHTML = q.q;
+
+      const reveal = document.createElement('button');
+      reveal.type = 'button';
+      reveal.className = 'btn iv-reveal';
+      reveal.dataset.action = 'reveal';
+      reveal.dataset.id = q.id;
+      reveal.setAttribute('aria-expanded', 'false');
+      reveal.setAttribute('aria-controls', 'ans-' + q.id);
+      reveal.textContent = 'Mostrar respuesta';
+
+      const ans = document.createElement('div');
+      ans.id = 'ans-' + q.id;
+      ans.className = 'iv-answer iv-hidden';
+      ans.setAttribute('aria-hidden', 'true');
+      ans.setAttribute('role', 'region');
+      const a = document.createElement('div');
+      a.className = 'iv-a';
+      a.innerHTML = q.a;
+      ans.appendChild(a);
+      if(q.code){
+        const pre = document.createElement('pre');
+        pre.className = 'iv-pre';
+        const code = document.createElement('code');
+        code.textContent = q.code;
+        pre.appendChild(code);
+        ans.appendChild(pre);
+      }
+      const trap = document.createElement('p');
+      trap.className = 'iv-trap';
+      trap.innerHTML = '<b>Trampa:</b> ' + q.trap;
+      ans.appendChild(trap);
+
+      const actions = document.createElement('div');
+      actions.className = 'iv-actions';
+      const know = document.createElement('button');
+      know.type = 'button';
+      know.className = 'btn' + (state.mastered[q.id] ? ' correct' : '');
+      know.dataset.action = 'know';
+      know.dataset.id = q.id;
+      know.setAttribute('aria-pressed', state.mastered[q.id] ? 'true' : 'false');
+      know.textContent = 'Lo sé';
+      const rev = document.createElement('button');
+      rev.type = 'button';
+      rev.className = 'btn' + (state.review[q.id] ? ' incorrect' : '');
+      rev.dataset.action = 'review';
+      rev.dataset.id = q.id;
+      rev.setAttribute('aria-pressed', state.review[q.id] ? 'true' : 'false');
+      rev.textContent = 'Repasar';
+      actions.append(know, rev);
+
+      art.append(head, qp, reveal, ans, actions);
+      frag.appendChild(art);
+    });
+    list.appendChild(frag);
+    updateProgress();
+  }
+
+  list.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    const id = btn.dataset.id;
+    if(btn.dataset.action === 'reveal'){
+      const ans = document.getElementById('ans-' + id);
+      if(!ans) return;
+      const hidden = ans.classList.toggle('iv-hidden');
+      btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+      ans.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+    } else if(btn.dataset.action === 'know'){
+      state.mastered[id] = !state.mastered[id];
+      if(state.mastered[id]) state.review[id] = false;
+      save('mastered', state.mastered);
+      save('review', state.review);
+      render();
+    } else if(btn.dataset.action === 'review'){
+      state.review[id] = !state.review[id];
+      if(state.review[id]) state.mastered[id] = false;
+      save('mastered', state.mastered);
+      save('review', state.review);
+      render();
+    }
+  });
+
+  chips.forEach(chip=>chip.addEventListener('click', ()=>{
+    chips.forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    state.cat = chip.dataset.ivCat;
+    render();
+  }));
+
+  levelSelect.addEventListener('change', ()=>{
+    state.lvl = levelSelect.value;
+    render();
+  });
+
+  searchInput.addEventListener('input', ()=>{
+    state.search = searchInput.value;
+    render();
+  });
+
+  // Simulacro
+  const simStartBox = section.querySelector('#ivSimStartBox');
+  const simQuiz = section.querySelector('#ivSimQuiz');
+  const simQ = section.querySelector('#ivSimQ');
+  const simTimer = section.querySelector('#ivSimTimer');
+  const simReveal = section.querySelector('#ivSimReveal');
+  const simAnswer = section.querySelector('#ivSimAnswer');
+  const simGrade = section.querySelector('#ivSimGrade');
+  const simYes = section.querySelector('#ivSimYes');
+  const simNo = section.querySelector('#ivSimNo');
+  const simNext = section.querySelector('#ivSimNext');
+  let currentSim = null;
+  let timeLeft = 0;
+  let timerId = null;
+
+  function showSimQuestion(q){
+    simStartBox.classList.add('iv-hidden');
+    simQuiz.classList.remove('iv-hidden');
+    simAnswer.classList.add('iv-hidden');
+    simGrade.classList.add('iv-hidden');
+    simNext.classList.add('iv-hidden');
+    simReveal.classList.remove('iv-hidden');
+    simQ.innerHTML = q.q;
+    simAnswer.innerHTML = '<div class="iv-a">' + q.a + '</div>' + (q.code ? '<pre class="iv-pre"><code>' + q.code.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre>' : '') + '<p class="iv-trap"><b>Trampa:</b> ' + q.trap + '</p>';
+  }
+
+  function clearTimer(){
+    if(timerId){ clearInterval(timerId); timerId = null; }
+  }
+
+  function tick(){
+    timeLeft--;
+    simTimer.textContent = timeLeft;
+    if(timeLeft <= 0){
+      clearTimer();
+      simTimer.textContent = '0';
+      simReveal.classList.add('iv-hidden');
+      simAnswer.classList.remove('iv-hidden');
+      simGrade.classList.add('iv-hidden');
+      simNext.classList.remove('iv-hidden');
+      state.review[currentSim.id] = true;
+      save('review', state.review);
+      updateProgress();
+      render();
+    }
+  }
+
+  function startSim(){
+    clearTimer();
+    const candidates = DATA.filter(q=>!state.mastered[q.id]);
+    if(!candidates.length){
+      simStartBox.innerHTML = '<p>Todas las preguntas están dominadas. Marca alguna como “Repasar” o reinicia el filtro.</p>';
+      return;
+    }
+    currentSim = candidates[Math.floor(Math.random() * candidates.length)];
+    timeLeft = 90;
+    simTimer.textContent = timeLeft;
+    showSimQuestion(currentSim);
+    timerId = setInterval(tick, 1000);
+  }
+
+  function stopAfterGrade(){
+    clearTimer();
+    simReveal.classList.add('iv-hidden');
+    simAnswer.classList.remove('iv-hidden');
+    simGrade.classList.add('iv-hidden');
+    simNext.classList.remove('iv-hidden');
+  }
+
+  simStartBox.querySelector('#ivSimStart').addEventListener('click', startSim);
+
+  simReveal.addEventListener('click', ()=>{
+    clearTimer();
+    simReveal.classList.add('iv-hidden');
+    simAnswer.classList.remove('iv-hidden');
+    simGrade.classList.remove('iv-hidden');
+  });
+
+  simYes.addEventListener('click', ()=>{
+    if(!currentSim) return;
+    state.mastered[currentSim.id] = true;
+    state.review[currentSim.id] = false;
+    save('mastered', state.mastered);
+    save('review', state.review);
+    updateProgress();
+    render();
+    stopAfterGrade();
+  });
+
+  simNo.addEventListener('click', ()=>{
+    if(!currentSim) return;
+    state.review[currentSim.id] = true;
+    save('review', state.review);
+    updateProgress();
+    render();
+    stopAfterGrade();
+  });
+
+  simNext.addEventListener('click', startSim);
+
+  // Checklist
+  const checkboxes = Array.from(section.querySelectorAll('.iv-checkbox'));
+  checkboxes.forEach(cb=>{
+    const id = cb.dataset.ivId;
+    cb.checked = !!state.check[id];
+    cb.addEventListener('change', ()=>{
+      state.check[id] = cb.checked;
+      save('check', state.check);
+    });
+  });
+
+  render();
+  updateProgress();
+})();
+</script>
+</body>
+</html>
