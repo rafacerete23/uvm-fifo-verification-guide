@@ -160,6 +160,71 @@ module tb_selfcheck;
     // one more cycle to confirm
     cycle(0, 0, 8'h00);
 
+    // Phase 9: reset asíncrono (dos escenarios)
+    // --- A) Reset desde FIFO llena con escrituras durante el reset ---
+    while (q.size() < 16) cycle(1, 0, 8'hC0);
+    #1;  // dejar pasar el NBA de la ultima escritura antes de comprobar
+    err_check(full == 1, "P9A: FIFO deberia estar llena antes del reset");
+    // Estamos a +1ns de un posedge. Ir a +4ns (mitad de ciclo, lejos de un flanco) y asertar reset con wr_en=1
+    #3;
+    wr_en = 1; rd_en = 0; wr_data = 8'hEE; rst_n = 0;
+    // Esperar 1ns sin cruzar flanco y comprobar reset asincrono inmediato
+    #1;
+    err_check(empty == 1, "P9A: empty debe ser 1 inmediatamente tras reset asincrono");
+    err_check(full  == 0, "P9A: full debe ser 0 inmediatamente tras reset asincrono");
+    // Mantener reset durante 3 posedges con wr_en=1; escrituras ignoradas
+    repeat (3) begin
+      @(posedge clk);
+      #1;
+      err_check(empty == 1, "P9A: empty debe seguir 1 durante reset");
+      err_check(full  == 0, "P9A: full debe seguir 0 durante reset");
+    end
+    // Liberar reset 1ns despues de un posedge con wr_en=0
+    wr_en = 0; rd_en = 0; wr_data = 8'h00;
+    #1;
+    rst_n = 1;
+    q.delete();
+    // Reajustar a posedge para que cycle() quede alineado
+    @(posedge clk);
+    // Escribir 3 valores conocidos y leerlos
+    cycle(1, 0, 8'h11);
+    cycle(1, 0, 8'h22);
+    cycle(1, 0, 8'h33);
+    cycle(0, 1, 8'h00);
+    cycle(0, 1, 8'h00);
+    cycle(0, 1, 8'h00);
+    #1;  // dejar pasar el NBA del ultimo pop antes de comprobar
+    err_check(empty == 1, "P9A: FIFO debe quedar vacia tras leer los 3 valores");
+
+    // --- B) Pulso de reset estrictamente entre dos flancos ---
+    // Estamos en posedge. Escribir 4 valores
+    cycle(1, 0, 8'hA1);
+    cycle(1, 0, 8'hA2);
+    cycle(1, 0, 8'hA3);
+    cycle(1, 0, 8'hA4);
+    // Tras el ultimo cycle estamos en posedge; esperar 1ns (evita carrera con el flanco) y poner wr_en=0, rd_en=0
+    #1;
+    wr_en = 0; rd_en = 0; wr_data = 8'h00;
+    // Pulso de reset de 2ns (entre +2ns y +4ns del ciclo), sin flanco de reloj en medio
+    #1;
+    rst_n = 0;
+    #2;
+    rst_n = 1;
+    q.delete();
+    // Comprobar inmediatamente (antes del siguiente flanco)
+    #1;
+    err_check(empty == 1, "P9B: empty debe ser 1 tras pulso de reset entre flancos");
+    err_check(full  == 0, "P9B: full debe ser 0 tras pulso de reset entre flancos");
+    // Reajustar a posedge
+    @(posedge clk);
+    // Confirmar con un ciclo nulo
+    cycle(0, 0, 8'h00);
+    // Confirmar que la FIFO funciona tras el reset
+    cycle(1, 0, 8'h5A);
+    cycle(0, 1, 8'h00);
+    #1;  // dejar pasar el NBA del ultimo pop antes de comprobar
+    err_check(empty == 1, "P9B: FIFO debe quedar vacia tras escribir y leer 8'h5A");
+
     // Summary
     if (errors == 0)
       $display("RESULT: PASS");

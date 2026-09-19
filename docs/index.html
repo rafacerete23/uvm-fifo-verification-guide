@@ -128,6 +128,25 @@ summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:
 .status h3{margin-top:0;color:var(--warn)}
 ul{padding-left:1.2rem}
 footer{padding:2rem 0;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;text-align:center}
+#clase-1 .c1-svgwrap{width:100%;overflow:hidden}
+#clase-1 svg{width:100%;height:auto;display:block}
+#clase-1 .c1-trace{stroke-width:2;fill:none}
+#clase-1 .c1-grid{stroke:var(--line);stroke-dasharray:3 4;stroke-width:1}
+#clase-1 .c1-lbl{fill:var(--muted);font:15px var(--mono)}
+#clase-1 .c1-lbl2{fill:var(--fg);font:16px var(--mono)}
+#clase-1 button[aria-pressed=true]{background:var(--acc);color:#04121a;border-color:var(--acc);font-weight:700}
+#clase-1 .c1-clk{stroke:var(--acc2)}
+#clase-1 .c1-rst{stroke:var(--warn)}
+#clase-1 .c1-bar{fill:var(--acc);opacity:.85}
+#clase-1 .c1-bar-empty{fill:var(--ok);opacity:.35}
+#clase-1 .c1-marker{fill:var(--err)}
+#clase-1 .c1-cursor{stroke:var(--fg);stroke-width:1.5;opacity:.7}
+#clase-1 .controls{flex-wrap:wrap;gap:.6rem;align-items:center}
+#clase-1 .controls label{display:flex;flex-direction:column;font-size:.85rem;gap:.25rem;min-width:180px;flex:1}
+#clase-1 input[type=range]{width:100%}
+#clase-1 > .wrap > .card{margin-top:1rem}
+#clase-1 .c1-svgwrap{margin-top:.5rem}
+.badge.err{border-color:var(--err);color:var(--err)}
 </style>
 </head>
 <body>
@@ -142,6 +161,7 @@ footer{padding:2rem 0;border-top:1px solid var(--line);color:var(--muted);font-s
       <a href="#fases">Fases</a>
       <a href="#tests">Tests</a>
       <a href="#run">Ejecutar</a>
+      <a href="#clase-1">Clase 1</a>
       <a href="#ejercicios">Ejercicios</a>
       <a href="#cambios">Cambios</a>
     </nav>
@@ -156,6 +176,7 @@ footer{padding:2rem 0;border-top:1px solid var(--line);color:var(--muted);font-s
     <a href="#tests">5. Tests y cobertura</a>
     <a href="#run">6. Cómo ejecutarlo</a>
     <a href="#aprender">7. Conceptos clave</a>
+    <a href="#clase-1">Clase 1 — Reset asíncrono</a>
     <a href="#ejercicios">8. Ejercicios</a>
     <a href="#cambios">9. Registro de cambios</a>
   </div>
@@ -180,8 +201,8 @@ footer{padding:2rem 0;border-top:1px solid var(--line);color:var(--muted);font-s
     <div class="status" role="note">
       <h3>Estado de verificación (honesto)</h3>
       <ul>
-        <li><strong>RTL verificado con Verilator 5.052</strong> usando <code>tb/selfcheck_tb.sv</code> (SystemVerilog plano, modelo de referencia independiente): <strong>PASS</strong> sobre ~15.300 ciclos (5.286 escrituras, 5.270 lecturas, 4.997 intentos de overflow, 11 de underflow aleatorios más dirigidos, 5.240 ciclos de lectura+escritura simultánea).</li>
-        <li><strong>Mutation check:</strong> 3 bugs inyectados a propósito (escribir con full, flag empty incorrecto, leer con empty) fueron <strong>detectados (FAIL)</strong>.</li>
+        <li><strong>RTL verificado con Verilator 5.052</strong> usando <code>tb/selfcheck_tb.sv</code> (SystemVerilog plano, modelo de referencia independiente): <strong>PASS</strong> sobre 15.354 ciclos (5.310 escrituras, 5.274 lecturas, 4.997 intentos de overflow, 11 de underflow aleatorios más dirigidos, 5.240 ciclos de lectura+escritura simultánea). Desde 2026-09-19 incluye la Fase 9 (reset asíncrono, ver Clase 1).</li>
+        <li><strong>Mutation check:</strong> 3 bugs inyectados a propósito (escribir con full, flag empty incorrecto, leer con empty) fueron <strong>detectados (FAIL)</strong>. Un cuarto mutante (reset síncrono en lugar de asíncrono, probado en una copia temporal) también da <strong>FAIL</strong> (7 errores), gracias a la Fase 9.</li>
         <li><strong>El testbench UVM</strong> parsea, elabora y construye toda su topología de componentes contra la librería Accellera UVM 2020.3.1 bajo Verilator 5.052, pero <strong>no se ejecutó hasta el final</strong>: Verilator 5.052 aborta dentro del arranque de fases de la propia librería UVM (<code>UVM_FATAL OBJTN_ZERO</code> en tiempo 0), incluso con un test UVM mínimo "hello". Es una <strong>limitación del simulador</strong>, no un resultado del testbench. Falta correrlo en Questa/VCS/Xcelium (o EDA Playground).</li>
       </ul>
     </div>
@@ -395,6 +416,81 @@ tb/tb_top.sv</code></pre>
   </div>
 </section>
 
+<!-- CLASE 1 -->
+<section id="clase-1" class="reveal">
+<div class="wrap">
+  <h2>Clase 1 — Reset asíncrono y cómo verificarlo</h2>
+  <p class="muted">Un pulso de reset entre flancos de reloj distingue un reset asíncrono de uno síncrono: aquí lo razonamos y lo medimos.</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>Teoría: asíncrono vs síncrono</h3>
+      <p>Un <strong>reset asíncrono</strong> aparece en la lista de sensibilidad del <code>always_ff</code> (<code>posedge clk or negedge rst_n</code>): al activarse, los punteros se limpian <em>sin esperar flanco de reloj</em>. Un <strong>reset síncrono</strong> solo se evalúa en <code>posedge clk</code>, así que un pulso corto que no cruza ningún flanco se pierde.</p>
+      <p>Práctica habitual en silicio: <em>activar asíncrono, liberar síncrono</em> mediante un sincronizador de reset de 2 flip-flops. Esto evita violar <strong>recovery/removal</strong> al soltar el reset cerca de un flanco (metaestabilidad).</p>
+      <p class="muted">Este RTL de la guía <strong>no</strong> implementa ese sincronizador: activa y libera el reset de forma asíncrona. Un testbench RTL plano no puede observar metaestabilidad; solo un modelo temporal o silicio real lo haría.</p>
+    </div>
+
+    <div class="card">
+      <h3>Qué hay que verificar</h3>
+      <ol>
+        <li>Al activar el reset a mitad de ciclo, <code>empty=1</code> y <code>full=0</code> <strong>de inmediato</strong>, sin esperar flanco.</li>
+        <li>Un pulso de reset entre dos flancos consecutivos también limpia la FIFO (así se distingue asíncrono de síncrono).</li>
+        <li>Las escrituras con <code>wr_en=1</code> durante el reset se ignoran.</li>
+        <li>Tras liberar el reset, la FIFO funciona y el orden FIFO se conserva.</li>
+      </ol>
+      <p class="muted">Los flags son combinacionales (<code>empty = (wr_ptr == rd_ptr)</code>), por eso en cuanto los punteros van a 0 el estado se refleja sin flanco.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Laboratorio de reset</h3>
+    <p class="muted">Reloj de 10 ns (flancos en t=0,10,20,30,40 ns). Ajusta el pulso y compara el RTL con un mutante síncrono.</p>
+    <div class="controls">
+      <label>Inicio del pulso de reset: <span id="c1-startv">3</span> ns después del flanco de t=10
+        <input type="range" id="c1-start" min="1" max="9" step="1" value="3">
+      </label>
+      <label>Duración del pulso (ns): <span id="c1-durv">3</span>
+        <input type="range" id="c1-dur" min="1" max="20" step="1" value="3">
+      </label>
+      <button type="button" id="c1-modeA" aria-pressed="true">Reset asíncrono (el RTL)</button>
+      <button type="button" id="c1-modeS" aria-pressed="false">Reset síncrono (mutante)</button>
+      <button type="button" id="c1-play">▶ Animar</button>
+    </div>
+    <div class="c1-svgwrap">
+      <svg id="c1-svg" viewBox="0 0 600 210" role="img" aria-label="Trazas de reloj, reset y estado de la FIFO entre 0 y 50 nanosegundos"></svg>
+    </div>
+    <p class="msg" id="c1-out" aria-live="polite"></p>
+  </div>
+
+  <div class="card">
+    <h3>Testbench plano (fragmento real)</h3>
+    <div class="codebox">
+      <button class="copy" data-target="c1-code">Copiar</button>
+      <pre><code id="c1-code"><span class="c">// Phase 9B: pulso de reset de 2ns (entre +2ns y +4ns del ciclo), sin flanco de reloj en medio</span>
+<span class="n">#1</span>;
+rst_n = <span class="n">0</span>;
+<span class="n">#2</span>;
+rst_n = <span class="n">1</span>;
+q.<span class="f">delete</span>();
+<span class="n">#1</span>;
+<span class="f">err_check</span>(empty == <span class="n">1</span>, <span class="s">"P9B: empty debe ser 1 tras pulso de reset entre flancos"</span>);
+<span class="f">err_check</span>(full  == <span class="n">0</span>, <span class="s">"P9B: full debe ser 0 tras pulso de reset entre flancos"</span>);</code></pre>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Resultado medido</h3>
+    <p>Estos chequeos son la <strong>Fase 9</strong> de <code>tb/selfcheck_tb.sv</code> y corrieron en <strong>Verilator 5.052</strong> con <span class="badge ok">RESULT: PASS</span>.</p>
+    <p>Se hizo además una <strong>mutación real</strong>: cambiar el RTL a <code>always_ff @(posedge clk)</code> (reset síncrono) en una copia temporal. El self-check dio <span class="badge err">FAIL</span> con <strong>7 errores</strong>, incluidos:</p>
+    <ul>
+      <li><code>empty debe ser 1 inmediatamente tras reset asincrono</code></li>
+      <li><code>empty debe ser 1 tras pulso de reset entre flancos</code></li>
+    </ul>
+    <p class="muted">Nota: esto es el testbench plano SystemVerilog, <strong>NO</strong> el testbench UVM (que sigue sin ejecutarse en ningún simulador).</p>
+  </div>
+</div>
+</section>
+
 <!-- 9 EJERCICIOS -->
 <section id="ejercicios" class="reveal">
   <div class="wrap">
@@ -429,7 +525,7 @@ tb/tb_top.sv</code></pre>
       <details><summary>Solución</summary><p>La escritura solo ocurre si <code>wr_en &amp;&amp; !full</code>. Con <code>full=1</code> la escritura queda bloqueada, pero la lectura sí cumple <code>rd_en &amp;&amp; !empty</code>, así que la FIFO se vacía una posición. El resultado neto es que la ocupación baja en 1. Simétricamente, con <code>empty=1</code> solo cuenta la escritura.</p></details>
     </div>
 
-    <div class="card">
+    <div class="card" style="margin-bottom:1rem">
       <h3>Ejercicio 3 — Añadir un bin de transición de ocupación</h3>
       <p>Añade a <code>fifo_coverage</code> un bin que cubra la transición de ocupación de 15 a 16 (llegar a full desde casi lleno).</p>
       <details><summary>Pista</summary><p>Puedes muestrear <code>count</code> y usar <code>bins trans</code> o guardar el valor anterior en una variable auxiliar.</p></details>
@@ -447,6 +543,96 @@ tb/tb_top.sv</code></pre>
         </div>
       </details>
     </div>
+
+    <div class="card" style="margin-bottom:1rem">
+
+      <h3>Ejercicio 4 — Reset a mitad de ciclo con la FIFO llena</h3>
+
+      <p>Escribe en el testbench plano un fragmento que, con la FIFO llena y <code>wr_en=1</code>, active <code>rst_n=0</code> a mitad de ciclo y compruebe de inmediato (sin esperar ningún flanco de reloj) que <code>empty==1</code> y <code>full==0</code>. Ten en cuenta que los flags son combinacionales a partir de los punteros de 5 bits.</p>
+
+      <details><summary>Pista</summary><p>Usa un retardo <code>#3</code> tras el <code>posedge</code> para colocarte a mitad de ciclo, y <code>#1</code> tras bajar <code>rst_n</code> para dejar que la lógica combinacional se estabilice. Recuerda que los flags <code>empty</code> y <code>full</code> no dependen del reloj, así que no necesitas esperar un flanco para observarlos.</p></details>
+
+      <details><summary>Solución</summary>
+
+        <p>Fragmento real tomado del self-check ya ejecutado en Verilator (Fase 9):</p>
+
+        <div class="codebox">
+
+          <button class="copy" data-target="s4">Copiar</button>
+
+          <pre><code id="s4"><span class="c">// FIFO llena, wr_en=1, activamos reset a mitad de ciclo</span>
+
+    <span class="k">#3</span>;
+
+    wr_en = <span class="n">1</span>; rd_en = <span class="n">0</span>; wr_data = <span class="n">8'hEE</span>; rst_n = <span class="n">0</span>;
+
+    <span class="k">#1</span>;
+
+    err_check(empty == <span class="n">1</span>, <span class="s">"P9A: empty debe ser 1 inmediatamente tras reset asincrono"</span>);
+
+    err_check(full  == <span class="n">0</span>, <span class="s">"P9A: full debe ser 0 inmediatamente tras reset asincrono"</span>);</code></pre>
+
+        </div>
+
+        <p>No hace falta esperar un flanco porque <code>rst_n</code> está en la lista de sensibilidad del bloque <code>always @(posedge clk or negedge rst_n)</code> y los flags son puramente combinacionales: en cuanto <code>rst_n</code> baja, los punteros se ponen a cero y <code>empty</code>/<code>full</code> se recalculan al instante. Las escrituras con <code>wr_en=1</code> durante el reset se ignoran porque el <code>if (!rst_n)</code> tiene prioridad sobre <code>do_wr</code>, de modo que <code>wr_data=8'hEE</code> no llega a entrar en la memoria.</p>
+
+      </details>
+
+    </div>
+
+
+    <div class="card" style="margin-bottom:1rem">
+
+      <h3>Ejercicio 5 — ¿Por qué liberar el reset de forma síncrona?</h3>
+
+      <p>El RTL de la guía activa <strong>y libera</strong> el reset de forma asíncrona. Explica qué riesgo tiene soltar <code>rst_n</code> justo antes de un flanco de reloj en silicio real y cómo se mitiga habitualmente.</p>
+
+      <details><summary>Pista</summary><p>Piensa en los tiempos de <em>recovery</em> y <em>removal</em> de un flip-flop y en qué ocurre si un biestable ve la liberación del reset dentro de su ventana de setup/hold.</p></details>
+
+      <details><summary>Solución</summary>
+
+        <p>Si <code>rst_n</code> se libera demasiado cerca de un flanco de reloj, se puede violar el tiempo de <em>recovery</em> (o <em>removal</em>) de los flip-flops de los punteros y provocar metaestabilidad. El problema práctico es que unos flip-flops pueden salir del reset en un ciclo y otros en el siguiente, dejando los punteros <code>wr_ptr</code> y <code>rd_ptr</code> en estados inconsistentes entre sí (por ejemplo, uno a cero y otro con un valor antiguo), lo que corrompe los flags <code>empty</code>/<code>full</code>.</p>
+
+        <p>La mitigación estándar es un <strong>sincronizador de reset</strong>: activación asíncrona (para que el reset surta efecto de inmediato) y liberación sincronizada mediante dos flip-flops en cadena, de modo que la salida del reset solo cambia alineada con el reloj y con margen suficiente respecto a los flancos.</p>
+
+        <p>Importante: este riesgo <strong>no se observa</strong> en simulación RTL con retardos cero ni con este testbench, y la FIFO de la guía <strong>no implementa</strong> dicho sincronizador; se menciona aquí como buena práctica de diseño para silicio real.</p>
+
+      </details>
+
+    </div>
+
+
+    <div class="card" style="margin-bottom:1rem">
+
+      <h3>Ejercicio 6 — Aserción para el reset (ejemplo, no ejecutado)</h3>
+
+      <p>Escribe una aserción inmediata dentro de un <code>always @(negedge rst_n)</code> que compruebe que <code>empty</code> y <code>full</code> toman los valores correctos un instante después de activar el reset.</p>
+
+      <details><summary>Pista</summary><p>Espera con <code>#1</code> dentro del <code>always</code> para dar tiempo a la lógica combinacional, y usa <code>assert(...) else $error(...)</code> para reportar el fallo.</p></details>
+
+      <details><summary>Solución</summary>
+
+        <div class="codebox">
+
+          <button class="copy" data-target="s6">Copiar</button>
+
+          <pre><code id="s6"><span class="k">always</span> @(<span class="k">negedge</span> rst_n) <span class="k">begin</span>
+
+      <span class="k">#1</span>;
+
+      <span class="k">assert</span> (empty === <span class="n">1'b1</span> &amp;&amp; full === <span class="n">1'b0</span>)
+
+        <span class="k">else</span> $error(<span class="s">"reset asincrono: flags incorrectos (empty=%b full=%b)"</span>, empty, full);
+
+    <span class="k">end</span></code></pre>
+
+        </div>
+
+        <p><strong>Fragmento de ejemplo: no se ejecutó en ningún simulador para esta guía.</strong> Se colocaría en el módulo del testbench, junto a la instancia del DUT, para monitorizar cualquier activación del reset. Con un reset síncrono (el mutante) esta aserción fallaría, porque los flags no cambiarían hasta el siguiente flanco de reloj; con el RTL actual pasaría por el mismo razonamiento que las comprobaciones de la Fase 9 (que sí se ejecutaron).</p>
+
+      </details>
+
+    </div>
   </div>
 </section>
 
@@ -456,6 +642,7 @@ tb/tb_top.sv</code></pre>
     <h2>9. Registro de cambios</h2>
     <div class="card">
       <ul>
+        <li><strong>2026-09-19</strong> — Clase 1 (reset asíncrono y su verificación) con laboratorio interactivo; ejercicios 4–6; Fase 9 en <code>tb/selfcheck_tb.sv</code> (reset a mitad de ciclo desde FIFO llena, pulso de reset entre flancos, escrituras durante el reset): PASS sobre 15.354 ciclos; un mutante de reset síncrono se detecta (FAIL, 7 errores). El testbench UVM sigue sin ejecutarse.</li>
         <li><strong>2026-09-19</strong> — Versión inicial.</li>
       </ul>
     </div>
@@ -721,6 +908,187 @@ tb/tb_top.sv</code></pre>
       stepPanels.forEach(function(p){ p.classList.toggle("on", p.getAttribute("data-i") === i); });
     });
   });
+
+  /* ---------- CLASE 1: LABORATORIO DE RESET ---------- */
+  (function(){
+    var svg = document.getElementById('c1-svg');
+    var out = document.getElementById('c1-out');
+    var startEl = document.getElementById('c1-start');
+    var durEl = document.getElementById('c1-dur');
+    var startV = document.getElementById('c1-startv');
+    var durV = document.getElementById('c1-durv');
+    var modeA = document.getElementById('c1-modeA');
+    var modeS = document.getElementById('c1-modeS');
+    var playBtn = document.getElementById('c1-play');
+    if(!svg || !out || !startEl || !durEl) return;
+
+    var isAsync = true;
+    var cursorT = 50;
+    var rafId = null;
+
+    var PX = 10, MX = 70, W = 600, H = 210;
+    var TMAX = 50;
+    function x(t){ return MX + t*PX; }
+
+    function c1Compute(start, dur, async){
+      var tS = 10 + start;
+      var tE = tS + dur;
+      var clearAt = null;
+      if(async){
+        clearAt = tS;
+      } else {
+        var k = 2;
+        while(k*10 <= TMAX){
+          var tk = k*10;
+          if(tk > tS && tk < tE){ clearAt = tk; break; }
+          k++;
+        }
+      }
+      return { tS: tS, tE: tE, clearAt: clearAt };
+    }
+
+    function el(tag, attrs, text){
+      var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      if(attrs){ for(var k in attrs){ e.setAttribute(k, attrs[k]); } }
+      if(text != null){ e.textContent = text; }
+      return e;
+    }
+
+    function draw(){
+      var start = parseInt(startEl.value, 10);
+      var dur = parseInt(durEl.value, 10);
+      var r = c1Compute(start, dur, isAsync);
+
+      while(svg.firstChild){ svg.removeChild(svg.firstChild); }
+      var dyn = el('g', {});
+
+      // fondo
+
+      // líneas verticales en flancos
+      for(var t=0; t<=TMAX; t+=10){
+        svg.appendChild(el('line', {x1:x(t), y1:20, x2:x(t), y2:190, 'class':'c1-grid'}));
+        svg.appendChild(el('text', {x:x(t), y:14, 'class':'c1-lbl', 'text-anchor':'middle'}, t+'ns'));
+      }
+
+      // etiquetas de trazas
+      svg.appendChild(el('text', {x:6, y:52, 'class':'c1-lbl2'}, 'clk'));
+      svg.appendChild(el('text', {x:6, y:102, 'class':'c1-lbl2'}, 'rst_n'));
+      svg.appendChild(el('text', {x:6, y:162, 'class':'c1-lbl2'}, 'FIFO'));
+
+      // clk: onda cuadrada, periodo 10ns, alto 0-5, bajo 5-10
+      var d = '';
+      for(var tt=0; tt<TMAX; tt+=10){
+        d += 'M ' + x(tt) + ' 40 L ' + x(tt+5) + ' 40 L ' + x(tt+5) + ' 60 L ' + x(tt+10) + ' 60 ';
+      }
+      dyn.appendChild(el('path', {d:d, 'class':'c1-trace c1-clk'}));
+
+      // rst_n: alto 90, bajo 110 durante [tS,tE)
+      var yH = 90, yL = 110;
+      var dR = 'M ' + x(0) + ' ' + yH;
+      if(r.tS > 0){ dR += ' L ' + x(r.tS) + ' ' + yH; }
+      dR += ' L ' + x(r.tS) + ' ' + yL;
+      dR += ' L ' + x(Math.min(r.tE, TMAX)) + ' ' + yL;
+      if(r.tE < TMAX){ dR += ' L ' + x(r.tE) + ' ' + yH + ' L ' + x(TMAX) + ' ' + yH; }
+      dyn.appendChild(el('path', {d:dR, 'class':'c1-trace c1-rst'}));
+
+      // FIFO: barra
+      var barY = 140, barH = 30;
+      var clearT = r.clearAt;
+      var fullUntil = (clearT == null) ? TMAX : clearT;
+
+      // barra llena
+      dyn.appendChild(el('rect', {x:x(0), y:barY, width:(fullUntil-0)*PX, height:barH, 'class':'c1-bar'}));
+      // barra vacía
+      if(clearT != null && clearT < TMAX){
+        dyn.appendChild(el('rect', {x:x(clearT), y:barY, width:(TMAX-clearT)*PX, height:barH, 'class':'c1-bar-empty'}));
+      }
+      // texto dentro de la barra
+      if(fullUntil > 0){
+        dyn.appendChild(el('text', {x:x(0)+6, y:barY+19, 'class':'c1-lbl2'}, '4 datos'));
+      }
+      if(clearT != null && clearT < TMAX){
+        dyn.appendChild(el('text', {x:x(clearT)+6, y:barY+19, 'class':'c1-lbl2'}, 'vacía'));
+      }
+
+      // marcador en clearAt
+      if(clearT != null){
+        dyn.appendChild(el('circle', {cx:x(clearT), cy:barY+barH/2, r:5, 'class':'c1-marker'}));
+      }
+
+      // durante la animacion solo se revela lo que el cursor ya ha recorrido
+      if(cursorT < TMAX){
+        var defs = el('defs', {});
+        var cp = el('clipPath', {id:'c1-clip'});
+        cp.appendChild(el('rect', {x:0, y:0, width:x(cursorT), height:H}));
+        defs.appendChild(cp);
+        svg.appendChild(defs);
+        dyn.setAttribute('clip-path', 'url(#c1-clip)');
+      }
+      svg.appendChild(dyn);
+
+      // cursor
+      if(cursorT < TMAX){
+        svg.appendChild(el('line', {x1:x(cursorT), y1:20, x2:x(cursorT), y2:190, 'class':'c1-cursor'}));
+      }
+
+      // mensaje
+      var msg;
+      if(isAsync){
+        var nextFlank = Math.ceil((r.tS+0.0001)/10)*10;
+        if(nextFlank <= r.tS) nextFlank += 10;
+        var delta = nextFlank - r.tS;
+        msg = 'Asíncrono: la FIFO se limpia en t=' + r.tS + ' ns, ' + delta + ' ns antes del siguiente flanco.';
+      } else {
+        if(r.clearAt == null){
+          msg = 'Síncrono: ningún flanco cae dentro del pulso [' + r.tS + ', ' + r.tE + ') ns → el reset se pierde y la FIFO conserva sus 4 datos.';
+        } else {
+          msg = 'Síncrono: el reset se aplica en el flanco t=' + r.clearAt + ' ns (dentro del pulso [' + r.tS + ', ' + r.tE + ') ns).';
+        }
+      }
+      out.textContent = msg;
+      out.className = 'msg ' + (r.clearAt != null ? 'ok' : 'err');
+    }
+
+    function setMode(async){
+      isAsync = async;
+      modeA.setAttribute('aria-pressed', async ? 'true' : 'false');
+      modeS.setAttribute('aria-pressed', async ? 'false' : 'true');
+      draw();
+    }
+
+    function animate(){
+      if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
+      if(reduce){ cursorT = TMAX; draw(); return; }
+      var t0 = null;
+      var durMs = 3000;
+      function step(ts){
+        if(t0 === null) t0 = ts;
+        var p = (ts - t0) / durMs;
+        if(p > 1) p = 1;
+        cursorT = p * TMAX;
+        draw();
+        if(p < 1){ rafId = requestAnimationFrame(step); }
+        else { rafId = null; }
+      }
+      rafId = requestAnimationFrame(step);
+    }
+
+    startEl.addEventListener('input', function(){
+      startV.textContent = startEl.value;
+      draw();
+    });
+    durEl.addEventListener('input', function(){
+      durV.textContent = durEl.value;
+      draw();
+    });
+    modeA.addEventListener('click', function(){ setMode(true); });
+    modeS.addEventListener('click', function(){ setMode(false); });
+    playBtn.addEventListener('click', animate);
+
+    startV.textContent = startEl.value;
+    durV.textContent = durEl.value;
+    draw();
+  })();
 
   /* ---------- COPY BUTTONS ---------- */
   document.querySelectorAll(".copy").forEach(function(btn){

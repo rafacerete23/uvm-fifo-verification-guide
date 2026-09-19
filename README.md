@@ -33,7 +33,7 @@ uvm-fifo-verification-guide/
 │   ├── fifo_tests.sv         # Tests: smoke, fill_drain, overflow_underflow, simul, random
 │   ├── fifo_pkg.sv           # Paquete UVM que importa y compila todo el testbench
 │   ├── tb_top.sv             # Top: reloj 100 MHz, instancia del DUT, interface y run_test()
-│   └── selfcheck_tb.sv       # Testbench plano en SystemVerilog con modelo de referencia independiente (para Verilator)
+│   └── selfcheck_tb.sv       # Testbench plano en SystemVerilog con modelo de referencia independiente (para Verilator); incluye la Fase 9 (reset asíncrono)
 ├── sim/
 │   ├── run_selfcheck.sh      # Corre el self-check con Verilator 5
 │   └── run_questa.sh         # Corre un test UVM con Questa
@@ -78,9 +78,9 @@ con los flags `+incdir+tb` y `+UVM_TESTNAME=<test>`.
 
 **RTL verificado con Verilator 5.052** usando `tb/selfcheck_tb.sv` (SystemVerilog plano, con modelo de referencia independiente):
 
-- **RESULT: PASS** sobre ~**15,300 ciclos**.
-- **5,286 escrituras**, **5,270 lecturas**, **4,997 intentos de overflow**, **11 intentos de underflow** (aleatorios más dirigidos), **5,240 ciclos de lectura y escritura simultáneas**.
-- **Mutation check:** se inyectaron 3 bugs deliberados en el RTL (escribir cuando está llena, flag `empty` incorrecto, leer cuando está vacía) y **los 3 fueron detectados (FAIL)**.
+- **RESULT: PASS** sobre **15,354 ciclos**.
+- **5,310 escrituras**, **5,274 lecturas**, **4,997 intentos de overflow**, **11 intentos de underflow** (aleatorios más dirigidos), **5,240 ciclos de lectura y escritura simultáneas**.
+- **Mutation check:** se inyectaron 3 bugs deliberados en el RTL (escribir cuando está llena, flag `empty` incorrecto, leer cuando está vacía) y **los 3 fueron detectados (FAIL)**. Además, desde la Fase 9 (reset asíncrono) un cuarto mutante —reset síncrono, probado en una copia temporal— también da **FAIL** (7 errores).
 
 **Testbench UVM:**
 
@@ -93,7 +93,7 @@ con los flags `+incdir+tb` y `+UVM_TESTNAME=<test>`.
 ## Ruta de aprendizaje
 
 1. **Lee el DUT** (`rtl/sync_fifo.sv`) y entiende por qué los punteros tienen un bit extra para distinguir `full` de `empty`.
-2. **Corre el self-check** (`bash sim/run_selfcheck.sh`) y observa el PASS sobre ~15,300 ciclos.
+2. **Corre el self-check** (`bash sim/run_selfcheck.sh`) y observa el PASS sobre 15,354 ciclos.
 3. **Estudia el testbench UVM** en orden: `fifo_if.sv` → `fifo_item.sv` → `fifo_sequences.sv` → `fifo_driver.sv` → `fifo_monitor.sv` → `fifo_scoreboard.sv` → `fifo_coverage.sv` → `fifo_agent.sv` → `fifo_env.sv` → `fifo_tests.sv`.
 4. **Explora la guía web didáctica** en `docs/index.html` (ábrela en tu navegador): incluye un simulador interactivo de la FIFO y ejercicios guiados.
 5. **Corre los tests UVM** en un simulador comercial (`bash sim/run_questa.sh fifo_random_test`) y experimenta con los demás tests.
@@ -105,13 +105,15 @@ con los flags `+incdir+tb` y `+UVM_TESTNAME=<test>`.
 Abre **`docs/index.html`** directamente en tu navegador. Incluye:
 
 - Un **simulador interactivo** de la FIFO (DEPTH 16) con punteros de cabeza y cola animados, entrada de datos 0–255, botones **Push**, **Pop**, **Push+Pop** (mismo ciclo) y **Random x10**, flags `full`/`empty` en vivo, contadores de *overflow intentados* y *underflow intentados*, y un panel de *scoreboard* que compara la cola de referencia con el contenido de la FIFO.
-- Una sección de **ejercicios** (`#ejercicios`) con pistas y soluciones colapsables.
+- La **Clase 1 — Reset asíncrono y cómo verificarlo** (`#clase-1`), con un laboratorio interactivo que compara el reset asíncrono del RTL con un mutante síncrono.
+- Una sección de **ejercicios** (`#ejercicios`, ejercicios 1–6) con pistas y soluciones colapsables.
 - Un **registro de cambios** (`#cambios`).
 
 ---
 
 ## Registro de cambios
 
+- **2026-09-19** — Clase 1 (reset asíncrono y su verificación) con laboratorio interactivo; ejercicios 4–6; Fase 9 en `tb/selfcheck_tb.sv` (reset a mitad de ciclo desde FIFO llena, pulso de reset entre flancos, escrituras durante el reset): PASS sobre 15,354 ciclos. El testbench UVM sigue sin ejecutarse en ningún simulador (los fragmentos de aserción del ejercicio 6 tampoco se ejecutaron).
 - **2026-09-19** — Versión inicial.
 
 ---
