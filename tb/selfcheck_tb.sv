@@ -1,4 +1,18 @@
 `timescale 1ns/1ps
+
+// Fase 10: clase de estimulo constrained-random (rand/constraint/dist)
+class fifo_stim;
+  rand bit wr_en;
+  rand bit rd_en;
+  rand bit [7:0] wr_data;
+  int wr_weight = 70;
+  int rd_weight = 70;
+  constraint c_dist {
+    wr_en dist {1'b1 := wr_weight, 1'b0 := (100 - wr_weight)};
+    rd_en dist {1'b1 := rd_weight, 1'b0 := (100 - rd_weight)};
+  }
+endclass
+
 module tb_selfcheck;
   logic clk = 0;
   logic rst_n;
@@ -224,6 +238,22 @@ module tb_selfcheck;
     cycle(0, 1, 8'h00);
     #1;  // dejar pasar el NBA del ultimo pop antes de comprobar
     err_check(empty == 1, "P9B: FIFO debe quedar vacia tras escribir y leer 8'h5A");
+
+    // Fase 10: constrained-random con dist real (rand/constraint/dist)
+    begin
+      fifo_stim stim = new();
+      int pesos_wr [4] = '{70, 90, 30, 50};
+      int pesos_rd [4] = '{70, 30, 90, 50};
+      for (int b = 0; b < 4; b++) begin
+        stim.wr_weight = pesos_wr[b];
+        stim.rd_weight = pesos_rd[b];
+        for (int i = 0; i < 1000; i++) begin
+          void'(stim.randomize());
+          cycle(stim.wr_en, stim.rd_en, stim.wr_data);
+        end
+      end
+      $display("Fase 10: constrained-random dist, 4000 ciclos (4x1000), pesos wr/rd = 70/70, 90/30, 30/90, 50/50");
+    end
 
     // Summary
     if (errors == 0)

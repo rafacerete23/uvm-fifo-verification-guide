@@ -106,7 +106,8 @@ Abre **`docs/index.html`** directamente en tu navegador. Incluye:
 
 - Un **simulador interactivo** de la FIFO (DEPTH 16) con punteros de cabeza y cola animados, entrada de datos 0–255, botones **Push**, **Pop**, **Push+Pop** (mismo ciclo) y **Random x10**, flags `full`/`empty` en vivo, contadores de *overflow intentados* y *underflow intentados*, y un panel de *scoreboard* que compara la cola de referencia con el contenido de la FIFO.
 - La **Clase 1 — Reset asíncrono y cómo verificarlo** (`#clase-1`), con un laboratorio interactivo que compara el reset asíncrono del RTL con un mutante síncrono.
-- Una sección de **ejercicios** (`#ejercicios`, ejercicios 1–6) con pistas y soluciones colapsables.
+- La **Clase 2 — Constrained-random y distribuciones** (`#clase-2`), con un laboratorio interactivo del operador `dist` y la clase de estímulo `fifo_stim`.
+- Una sección de **ejercicios** (`#ejercicios`, ejercicios 1–9) con pistas y soluciones colapsables.
 - Un **registro de cambios** (`#cambios`).
 
 ---
@@ -116,6 +117,8 @@ Abre **`docs/index.html`** directamente en tu navegador. Incluye:
 `docs/curso.html` es un curso interactivo en 8 niveles (el último es preparación de entrevistas) (electricidad → lógica → secuencial → FIFO → UVM → cobertura y aserciones → prácticas de empresa) con calculadoras, un simulador de la FIFO (modelo del RTL, scoreboard y forma de onda), quizzes y un diagrama UVM clicable. Ábrelo directamente en el navegador.
 
 ## Registro de cambios
+
+- **2026-09-23** — Clase 2 (constrained-random y distribuciones) con laboratorio interactivo de `dist`; ejercicios 7–9; Fase 10 en `tb/selfcheck_tb.sv` (clase `fifo_stim` con `rand`/`constraint`/`dist`, 4.000 ciclos en cuatro combinaciones de pesos wr/rd): RESULT: PASS. El testbench UVM sigue sin ejecutarse en ningún simulador.
 
 ### 2026-09-19 — Curso 0→experto y scripts robustos
 

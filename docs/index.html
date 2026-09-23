@@ -492,6 +492,167 @@ q.<span class="f">delete</span>();
 </div>
 </section>
 
+<!-- CLASE 2 -->
+<section id="clase-2" class="reveal"><div class="wrap">
+<h2>Clase 2 — Constrained-random y distribuciones</h2>
+
+<div class="grid g2">
+<div class="card">
+<h3>rand, randc y bloques constraint</h3>
+<p>En SystemVerilog, una variable declarada con <code>rand</code> se randomiza cada vez que se llama a <code>randomize()</code> sobre el objeto que la contiene. La palabra clave <code>randc</code> (random-cyclic) garantiza que todos los valores posibles del rango se agoten antes de repetir cualquiera, lo cual es útil para cubrir combinaciones sin repeticiones prematuras.</p>
+<p>Los <code>constraint</code> son bloques declarativos que restringen el espacio de soluciones. El solver del simulador busca una asignación que satisfaga <em>todas</em> las restricciones activas a la vez; si no existe, <code>randomize()</code> devuelve 0 y la asignación queda sin efecto. Esto es radicalmente distinto a generar números con <code>$urandom_range</code> y luego filtrarlos con <code>if</code>: aquí el solver construye directamente valores válidos.</p>
+<p>La randomización vive naturalmente dentro de clases (<code>class fifo_stim;</code>), aunque también puede usarse en un testbench plano instanciando esa clase y llamando a <code>obj.randomize()</code>. En UVM el mismo patrón se aplica dentro de un <code>uvm_sequence_item</code> con <code>rand</code> y <code>constraint</code>, pero aquí lo usamos sin UVM.</p>
+</div>
+
+<div class="card">
+<h3>dist: pesos con := y :/</h3>
+<p>El operador <code>dist</code> asigna un peso a cada valor o rango dentro de un constraint. Hay dos formas de expresar el peso:</p>
+<ul>
+<li><code>:=</code> — peso <strong>absoluto</strong> por cada valor del conjunto. Si escribes <code>{1'b1 := 70, 1'b0 := 30}</code>, el 70% de las muestras serán 1 y el 30% serán 0.</li>
+<li><code>:/</code> — peso <strong>repartido</strong> entre todos los valores del rango. Si escribes <code>{[0:3] :/ 100}</code>, cada uno de los 4 valores recibe 25.</li>
+</ul>
+<p>La diferencia importa cuando un mismo peso se aplica a un rango: con <code>:=</code> el peso se multiplica por el tamaño del rango; con <code>:/</code> se divide. Para dos valores discretos como <code>1'b1</code> y <code>1'b0</code>, ambos operadores coinciden, pero conviene entender la distinción para rangos más amplios.</p>
+<p>Comparado con la Fase 7 actual del self-check (tres bloques de <code>$urandom_range</code> con umbrales fijos 50/50, 80/20, 20/80), <code>dist</code> es declarativo, reproducible, composable con otras restricciones y verificado por el solver. Los umbrales fijos a mano solo aproximan una distribución; <code>dist</code> la especifica.</p>
+</div>
+</div>
+
+<div class="card">
+<h3>Laboratorio — Distribución dist interactiva</h3>
+<p>Ajusta los pesos deseados de <code>wr_en=1</code> y <code>rd_en=1</code> (en %). Al pulsar <strong>Simular</strong> se generan N=2000 muestras con <code>Math.random()</code> en el navegador y se comparan las frecuencias observadas contra los pesos pedidos. Esta visualización es solo didáctica: no sustituye al self-check real de SystemVerilog.</p>
+
+<div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:0.75rem 0">
+<label>Peso wr_en=1: <input type="range" id="c2-wrSlider" min="0" max="100" value="70"> <span id="c2-wrv">70%</span></label>
+<label>Peso rd_en=1: <input type="range" id="c2-rdSlider" min="0" max="100" value="70"> <span id="c2-rdv">70%</span></label>
+<button id="c2-play" type="button">Simular</button>
+</div>
+
+<svg id="c2-svg" viewBox="0 0 600 210" role="img" aria-label="Histograma de distribución dist"></svg>
+<p class="msg" id="c2-out" aria-live="polite"></p>
+</div>
+
+<div class="card">
+<h3>Testbench (fragmento real)</h3>
+<p>Esta es la clase de estímulo constrained-random añadida como <strong>Fase 10</strong> a <code>tb/selfcheck_tb.sv</code>. Es un testbench plano SystemVerilog: no usa UVM, no hereda de <code>uvm_sequence_item</code>, y se ejecuta con <code>obj.randomize()</code> en un bucle de ciclos. Este fragmento SÍ se ejecutó en Verilator 5.052.</p>
+<div class="codebox"><button class="copy" data-target="c2-code-stim">Copiar</button><pre><code id="c2-code-stim"><span class="k">class</span> <span class="f">fifo_stim</span>;
+  <span class="k">rand</span> <span class="k">bit</span> wr_en;
+  <span class="k">rand</span> <span class="k">bit</span> rd_en;
+  <span class="k">rand</span> <span class="k">bit</span> [<span class="n">7</span>:<span class="n">0</span>] wr_data;
+  <span class="k">int</span> wr_weight = <span class="n">70</span>; <span class="c">// % deseado de wr_en=1</span>
+  <span class="k">int</span> rd_weight = <span class="n">70</span>; <span class="c">// % deseado de rd_en=1</span>
+
+  <span class="k">constraint</span> c_dist {
+    wr_en <span class="k">dist</span> {<span class="n">1'b1</span> :<span class="k">=</span> wr_weight, <span class="n">1'b0</span> :<span class="k">=</span> (<span class="n">100</span> - wr_weight)};
+    rd_en <span class="k">dist</span> {<span class="n">1'b1</span> :<span class="k">=</span> rd_weight, <span class="n">1'b0</span> :<span class="k">=</span> (<span class="n">100</span> - rd_weight)};
+  }
+<span class="k">endclass</span></code></pre></div>
+<p>En la Fase 10 se instancia <code>fifo_stim</code>, se ajustan <code>wr_weight</code> y <code>rd_weight</code> a los valores de cada escenario, y en cada ciclo se llama a <code>randomize()</code> para obtener <code>wr_en</code>, <code>rd_en</code> y <code>wr_data</code>. El resto del self-check (modelo de referencia con cola SV, comparación de <code>full</code>, <code>empty</code>, <code>rd_data</code>) se reutiliza sin cambios, dentro de la tarea <code>cycle()</code> ya existente.</p>
+</div>
+
+<div class="card">
+<h3>Resultado medido</h3>
+<p>Fase 10 añadida a <code>tb/selfcheck_tb.sv</code>: 4.000 ciclos usando <code>fifo_stim::randomize()</code> con cuatro combinaciones de pesos (wr=70/rd=70, wr=90/rd=30, wr=30/rd=90, wr=50/rd=50), comparados contra el mismo modelo de referencia (cola SV) que el resto del self-check. <strong>RESULT: PASS.</strong></p>
+<p>Esto sigue siendo el testbench plano SystemVerilog ejecutado en Verilator 5.052, no UVM. El testbench UVM de la carpeta <code>tb/</code> existe pero nunca se ha ejecutado hasta el final en ningún simulador: Verilator 5.052 aborta en el arranque de fases de UVM con <code>UVM_FATAL OBJTN_ZERO</code>. Por tanto, cualquier afirmación sobre UVM en esta guía debe leerse como trabajo pendiente, no como verificación completada.</p>
+</div>
+</div></section>
+
+<script>(function(){ "use strict";
+  var svg = document.getElementById("c2-svg");
+  var out = document.getElementById("c2-out");
+  var wrSlider = document.getElementById("c2-wrSlider");
+  var rdSlider = document.getElementById("c2-rdSlider");
+  var wrv = document.getElementById("c2-wrv");
+  var rdv = document.getElementById("c2-rdv");
+  var play = document.getElementById("c2-play");
+  if(!svg || !out || !wrSlider || !rdSlider || !wrv || !rdv || !play) return;
+
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, text){
+    var n = document.createElementNS(NS, tag);
+    if(attrs){ for(var k in attrs){ if(Object.prototype.hasOwnProperty.call(attrs,k)) n.setAttribute(k, attrs[k]); } }
+    if(text !== undefined && text !== null) n.textContent = text;
+    return n;
+  }
+
+  var reduceMotion = false;
+  try {
+    reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch(e){ reduceMotion = false; }
+
+  var N = 2000;
+  var W = 600, H = 210;
+  var padL = 50, padR = 20, padT = 20, padB = 40;
+  var plotW = W - padL - padR;
+  var plotH = H - padT - padB;
+
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
+
+  function drawAxes(){
+    svg.appendChild(el("line", {x1:padL, y1:padT, x2:padL, y2:padT+plotH, stroke:"#888", "stroke-width":"1"}));
+    svg.appendChild(el("line", {x1:padL, y1:padT+plotH, x2:padL+plotW, y2:padT+plotH, stroke:"#888", "stroke-width":"1"}));
+    for(var i=0;i<=4;i++){
+      var y = padT + plotH - (plotH * i / 4);
+      svg.appendChild(el("line", {x1:padL-4, y1:y, x2:padL, y2:y, stroke:"#888", "stroke-width":"1"}));
+      svg.appendChild(el("text", {x:padL-8, y:y+4, "text-anchor":"end", "font-size":"10", fill:"#666"}, (i*25)+"%"));
+    }
+  }
+
+  function drawBar(x, w, frac, color, label, obsPct, wantPct){
+    var h = plotH * Math.max(0, Math.min(1, frac));
+    var y = padT + plotH - h;
+    var rect = el("rect", {x:x, y:y, width:w, height:h, fill:color, rx:"3"});
+    svg.appendChild(rect);
+    svg.appendChild(el("text", {x:x+w/2, y:padT+plotH+14, "text-anchor":"middle", "font-size":"11", fill:"#444"}, label));
+    svg.appendChild(el("text", {x:x+w/2, y:y-6, "text-anchor":"middle", "font-size":"11", fill:"#222"}, obsPct.toFixed(1)+"%"));
+    svg.appendChild(el("text", {x:x+w/2, y:padT+plotH+28, "text-anchor":"middle", "font-size":"10", fill:"#888"}, "obj "+wantPct+"%"));
+    if(!reduceMotion){
+      rect.style.transition = "none";
+      rect.setAttribute("height", "0");
+      rect.setAttribute("y", String(padT+plotH));
+      var targetH = h, targetY = y;
+      requestAnimationFrame(function(){
+        rect.style.transition = "height 400ms ease, y 400ms ease";
+        rect.setAttribute("height", String(targetH));
+        rect.setAttribute("y", String(targetY));
+      });
+    }
+  }
+
+  function simulate(){
+    var wrW = parseInt(wrSlider.value, 10);
+    var rdW = parseInt(rdSlider.value, 10);
+    wrv.textContent = wrW + "%";
+    rdv.textContent = rdW + "%";
+
+    var wr1 = 0, rd1 = 0;
+    for(var i=0;i<N;i++){
+      if(Math.random() * 100 < wrW) wr1++;
+      if(Math.random() * 100 < rdW) rd1++;
+    }
+    var wr0 = N - wr1, rd0 = N - rd1;
+    var wr1p = 100*wr1/N, wr0p = 100*wr0/N;
+    var rd1p = 100*rd1/N, rd0p = 100*rd0/N;
+
+    clearSvg();
+    drawAxes();
+
+    var gap = 20;
+    var bw = (plotW - gap*3) / 4;
+    var x0 = padL + gap;
+    drawBar(x0,               bw, wr1p/100, "#4a90d9", "wr_en=1", wr1p, wrW);
+    drawBar(x0 + (bw+gap),    bw, wr0p/100, "#9bbfe0", "wr_en=0", wr0p, 100-wrW);
+    drawBar(x0 + 2*(bw+gap),  bw, rd1p/100, "#d97a4a", "rd_en=1", rd1p, rdW);
+    drawBar(x0 + 3*(bw+gap),  bw, rd0p/100, "#e0b79b", "rd_en=0", rd0p, 100-rdW);
+
+    out.textContent = "N=" + N + " muestras · wr_en=1: " + wr1 + " (" + wr1p.toFixed(1) + "%, obj " + wrW + "%) · wr_en=0: " + wr0 + " (" + wr0p.toFixed(1) + "%, obj " + (100-wrW) + "%) · rd_en=1: " + rd1 + " (" + rd1p.toFixed(1) + "%, obj " + rdW + "%) · rd_en=0: " + rd0 + " (" + rd0p.toFixed(1) + "%, obj " + (100-rdW) + "%)";
+  }
+
+  wrSlider.addEventListener("input", function(){ wrv.textContent = wrSlider.value + "%"; });
+  rdSlider.addEventListener("input", function(){ rdv.textContent = rdSlider.value + "%"; });
+  play.addEventListener("click", simulate);
+
+  simulate();
+})();</script>
+
 <!-- 9 EJERCICIOS -->
 <section id="ejercicios" class="reveal">
   <div class="wrap">
@@ -634,6 +795,103 @@ q.<span class="f">delete</span>();
       </details>
 
     </div>
+
+    <p class="muted" style="margin:0.5rem 0 1rem">Los ejercicios 7–9 (constrained-random y distribuciones) proponen variantes de <code>fifo_stim</code> distintas de la Fase 10 real: son fragmentos de ejemplo para resolver, <strong>no se han ejecutado</strong> en ningún simulador. La única clase <code>fifo_stim</code> que sí corrió en Verilator 5.052 es la que aparece en la Clase 2 (solo <code>wr_en</code>/<code>rd_en</code>/<code>wr_data</code> con <code>dist</code> simple).</p>
+
+    <div class="card" style="margin-bottom:1rem">
+      <h3>Ejercicio 7 — Controlar la probabilidad conjunta con una variable de 2 bits</h3>
+      <p>En la Fase 10 de <code>tb/selfcheck_tb.sv</code> tienes dos <code>dist</code> independientes, uno sobre <code>wr_en</code> y otro sobre <code>rd_en</code>, ambos con peso 70. Con esa configuración, la probabilidad de que <code>wr_en=1</code> y <code>rd_en=1</code> en el mismo ciclo es aproximadamente 0.7·0.7 = 0.49 (49%), porque los dos bits son estadísticamente independientes. Añade una <code>constraint</code> adicional a <code>fifo_stim</code> que garantice que el estímulo simultáneo <code>wr_en=1 &amp; rd_en=1</code> ocurra como mucho el 10% de las veces, usando una variable auxiliar <code>rand bit [1:0] op</code> con <code>dist</code> sobre las cuatro combinaciones (00, 01, 10, 11) y pesos explícitos. Explica por qué dos <code>dist</code> independientes sobre <code>wr_en</code> y <code>rd_en</code> no permiten controlar directamente esa probabilidad conjunta.</p>
+      <details><summary>Pista</summary><p>Recuerda que <code>dist</code> reparte probabilidad sobre los valores de <b>una sola</b> variable. Si quieres fijar la probabilidad de una combinación de bits, necesitas una variable que codifique esa combinación. Mapea <code>op[1]=wr_en</code> y <code>op[0]=rd_en</code>, y asigna pesos que sumen 100: por ejemplo 10 para <code>2'b11</code>, y reparte los 90 restantes entre <code>2'b00</code>, <code>2'b01</code> y <code>2'b10</code>. Después deriva <code>wr_en</code> y <code>rd_en</code> desde <code>op</code> en un <code>post_randomize()</code> o en el propio testbench.</p></details>
+      <details><summary>Solución</summary>
+        <div class="codebox">
+          <button class="copy" data-target="s7">Copiar</button>
+          <pre><code id="s7"><span class="k">class</span> <span class="n">fifo_stim</span>;
+  <span class="k">rand</span> <span class="k">bit</span> <span class="k">[1:0]</span> <span class="n">op</span>;   <span class="c">// op[1]=wr_en, op[0]=rd_en</span>
+  <span class="k">rand</span> <span class="k">bit</span> <span class="k">[7:0]</span> <span class="n">wr_data</span>;
+
+  <span class="c">// 00: idle 25% | 01: solo lectura 30% | 10: solo escritura 35% | 11: ambos 10%</span>
+  <span class="k">constraint</span> <span class="n">c_joint</span> {
+    <span class="n">op</span> <span class="k">dist</span> { <span class="n">2'b00</span> :<span class="k">=</span> <span class="n">25</span>,
+               <span class="n">2'b01</span> :<span class="k">=</span> <span class="n">30</span>,
+               <span class="n">2'b10</span> :<span class="k">=</span> <span class="n">35</span>,
+               <span class="n">2'b11</span> :<span class="k">=</span> <span class="n">10</span> };
+  }
+
+  <span class="k">function</span> <span class="k">void</span> <span class="n">post_randomize</span>();
+    <span class="n">wr_en</span> <span class="k">=</span> <span class="n">op</span>[<span class="n">1</span>];
+    <span class="n">rd_en</span> <span class="k">=</span> <span class="n">op</span>[<span class="n">0</span>];
+  <span class="k">endfunction</span>
+<span class="k">endclass</span></code></pre>
+        </div>
+        <p>Dos <code>dist</code> independientes sobre <code>wr_en</code> y <code>rd_en</code> fijan las probabilidades <b>marginales</b> P(wr_en=1)=0.7 y P(rd_en=1)=0.7, pero no dicen nada sobre la <b>conjunta</b> P(wr_en=1, rd_en=1): bajo independencia estadística esa conjunta es el producto 0.49, y no hay forma de subirla o bajarla sin tocar las marginales. Al colapsar los dos bits en una única variable <code>op</code> de 2 bits, el <code>dist</code> reparte el 100% de la masa de probabilidad sobre las cuatro combinaciones y puedes fijar directamente P(2'b11)=10%, que es exactamente lo que pide el enunciado. El <code>post_randomize()</code> sólo descompone <code>op</code> en los dos bits que consume el DUT, sin volver a randomizar.</p>
+      </details>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <h3>Ejercicio 8 — randc frente a rand para cubrir los 256 valores de wr_data</h3>
+      <p>Quieres barrer de forma exhaustiva los 256 valores posibles de <code>wr_data</code> en una ronda de 256 escrituras consecutivas al FIFO. Cambia la declaración de <code>wr_data</code> en <code>fifo_stim</code> para que use <code>randc</code> en lugar de <code>rand</code>, y explica la diferencia de garantía entre ambos modificadores. Después razona por qué <code>randc</code> no es práctico cuando el rango es grande (por ejemplo un <code>randc bit [31:0]</code>).</p>
+      <details><summary>Pista</summary><p><code>randc</code> mantiene internamente una permutación del rango y la recorre sin repetir hasta agotarla, momento en el que vuelve a empezar. Pregúntate cuánta memoria y cuánto tiempo de inicialización necesitaría esa permutación para 2^32 valores.</p></details>
+      <details><summary>Solución</summary>
+        <div class="codebox">
+          <button class="copy" data-target="s8">Copiar</button>
+          <pre><code id="s8"><span class="k">class</span> <span class="n">fifo_stim</span>;
+  <span class="k">rand</span>  <span class="k">bit</span> <span class="k">[1:0]</span> <span class="n">op</span>;
+  <span class="k">randc</span> <span class="k">bit</span> <span class="k">[7:0]</span> <span class="n">wr_data</span>;   <span class="c">// barrido exhaustivo del byte</span>
+
+  <span class="k">constraint</span> <span class="n">c_joint</span> {
+    <span class="n">op</span> <span class="k">dist</span> { <span class="n">2'b00</span> :<span class="k">=</span> <span class="n">25</span>, <span class="n">2'b01</span> :<span class="k">=</span> <span class="n">30</span>,
+               <span class="n">2'b10</span> :<span class="k">=</span> <span class="n">35</span>, <span class="n">2'b11</span> :<span class="k">=</span> <span class="n">10</span> };
+  }
+
+  <span class="k">function</span> <span class="k">void</span> <span class="n">post_randomize</span>();
+    <span class="n">wr_en</span> <span class="k">=</span> <span class="n">op</span>[<span class="n">1</span>];
+    <span class="n">rd_en</span> <span class="k">=</span> <span class="n">op</span>[<span class="n">0</span>];
+  <span class="k">endfunction</span>
+<span class="k">endclass</span></code></pre>
+        </div>
+        <p>Con <code>rand</code>, cada llamada a <code>randomize()</code> extrae un valor uniforme e independiente del rango: en 256 tiradas puedes repetir valores y dejar otros sin visitar (el problema clásico del colector de cupones). Con <code>randc</code>, el solver mantiene una permutación cíclica del rango y la recorre sin repetir hasta agotarla: en 256 escrituras garantizas ver <b>los 256 valores</b> exactamente una vez, lo cual es ideal para cobertura funcional exhaustiva de un byte. La contrapartida es el coste: <code>randc</code> necesita almacenar y permutar todo el rango, así que con <code>bit [31:0]</code> serían 2^32 entradas (decenas de GB) y un tiempo de inicialización prohibitivo; en la práctica <code>randc</code> se limita a rangos pequeños (bytes, nibbles, enums cortos) y para rangos grandes se usa <code>rand</code> con <code>constraint</code> de cobertura o <code>dist</code> sesgado.</p>
+      </details>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <h3>Ejercicio 9 — Ráfagas aleatorias de solo escritura seguidas de solo lectura</h3>
+      <p>Las Fases 2 y 3 del self-check llenan el FIFO y luego lo vacían de forma <b>dirigida</b>. Añade a <code>fifo_stim</code> una variable de estado <code>rand bit in_burst</code> y las constraints necesarias para que el estímulo genere, de forma aleatoria, ráfagas de solo escritura (<code>wr_en=1, rd_en=0</code>) seguidas de ráfagas de solo lectura (<code>wr_en=0, rd_en=1</code>), forzando así el escenario "llenar y luego vaciar" sin dirigirlo a mano. Explica por qué este estímulo <b>complementa</b> y no sustituye a las Fases 2 y 3.</p>
+      <details><summary>Pista</summary><p>Usa <code>in_burst</code> para seleccionar el modo (por ejemplo 0 = fase de escritura, 1 = fase de lectura) y añade un contador de longitud de ráfaga <code>rand int burst_len</code> con un rango razonable (por ejemplo 1..DEPTH). Dentro de una ráfaga, la constraint debe forzar que sólo uno de los dos enables esté activo según <code>in_burst</code>. Cambiar <code>in_burst</code> sólo cuando la ráfaga anterior ha terminado es lo que produce el patrón llenar/vaciar.</p></details>
+      <details><summary>Solución</summary>
+        <div class="codebox">
+          <button class="copy" data-target="s9">Copiar</button>
+          <pre><code id="s9"><span class="k">class</span> <span class="n">fifo_stim</span>;
+  <span class="k">rand</span> <span class="k">bit</span>       <span class="n">in_burst</span>;   <span class="c">// 0 = llenar, 1 = vaciar</span>
+  <span class="k">rand</span> <span class="k">int</span>       <span class="n">burst_len</span>;  <span class="c">// ciclos que dura la ráfaga</span>
+  <span class="k">rand</span> <span class="k">bit</span> <span class="k">[7:0]</span> <span class="n">wr_data</span>;
+  <span class="k">rand</span> <span class="k">bit</span>       <span class="n">wr_en</span>;
+  <span class="k">rand</span> <span class="k">bit</span>       <span class="n">rd_en</span>;
+
+  <span class="k">constraint</span> <span class="n">c_burst_len</span> {
+    <span class="n">burst_len</span> <span class="k">inside</span> {[<span class="n">1</span> : <span class="n">16</span>]};   <span class="c">// DEPTH = 16</span>
+  }
+
+  <span class="k">constraint</span> <span class="n">c_burst_mode</span> {
+    <span class="k">if</span> (<span class="n">in_burst</span> <span class="k">==</span> <span class="n">1'b0</span>) { <span class="n">wr_en</span> <span class="k">==</span> <span class="n">1'b1</span>; <span class="n">rd_en</span> <span class="k">==</span> <span class="n">1'b0</span>; }
+    <span class="k">else</span>               { <span class="n">wr_en</span> <span class="k">==</span> <span class="n">1'b0</span>; <span class="n">rd_en</span> <span class="k">==</span> <span class="n">1'b1</span>; }
+  }
+<span class="k">endclass</span>
+
+<span class="c">// Uso en el testbench: alternar in_burst al agotar burst_len</span>
+<span class="c">// int cnt = 0;</span>
+<span class="c">// repeat (N) begin</span>
+<span class="c">//   if (cnt == 0) begin</span>
+<span class="c">//     void'(stim.randomize());</span>
+<span class="c">//     cnt = stim.burst_len;</span>
+<span class="c">//     stim.in_burst = ~stim.in_burst;   // cambia de fase al empezar ráfaga</span>
+<span class="c">//   end</span>
+<span class="c">//   drive(stim);</span>
+<span class="c">//   cnt--;</span>
+<span class="c">// end</span></code></pre>
+        </div>
+        <p>Las Fases 2 y 3 del self-check son <b>dirigidas</b>: escriben exactamente DEPTH veces y luego leen exactamente DEPTH veces, con un patrón conocido y verificable paso a paso. Eso es perfecto para comprobar el caso límite "FIFO lleno" y "FIFO vacío" de forma determinista, pero no explora longitudes de ráfaga intermedias, ni transiciones bruscas, ni combinaciones de llenados parciales seguidos de vaciados parciales. El estímulo con <code>in_burst</code> y <code>burst_len</code> aleatorio genera esas variantes (ráfagas de 1 a 16 ciclos, alternancia aleatoria entre llenar y vaciar) y por tanto <b>complementa</b> la cobertura: las fases dirigidas garantizan los casos esquina conocidos, y el constrained-random busca los que no se te ocurrieron. Sustituir las Fases 2 y 3 por este estímulo aleatorio perdería la garantía determinista de haber tocado exactamente los límites del FIFO, que es justo lo que un self-check quiere asegurar en cada ejecución.</p>
+      </details>
+    </div>
   </div>
 </section>
 
@@ -643,6 +901,7 @@ q.<span class="f">delete</span>();
     <h2>9. Registro de cambios</h2>
     <div class="card">
       <ul>
+        <li><strong>2026-09-23</strong> — Clase 2 (constrained-random y distribuciones) con laboratorio interactivo de <code>dist</code>; ejercicios 7–9; Fase 10 en <code>tb/selfcheck_tb.sv</code> (clase <code>fifo_stim</code> con <code>rand</code>/<code>constraint</code>/<code>dist</code>, 4.000 ciclos en cuatro combinaciones de pesos wr/rd): RESULT: PASS. El testbench UVM sigue sin ejecutarse.</li>
         <li><strong>2026-09-19</strong> — Clase 1 (reset asíncrono y su verificación) con laboratorio interactivo; ejercicios 4–6; Fase 9 en <code>tb/selfcheck_tb.sv</code> (reset a mitad de ciclo desde FIFO llena, pulso de reset entre flancos, escrituras durante el reset): PASS sobre 15.354 ciclos; un mutante de reset síncrono se detecta (FAIL, 7 errores). El testbench UVM sigue sin ejecutarse.</li>
         <li><strong>2026-09-19</strong> — Versión inicial.</li>
       </ul>
